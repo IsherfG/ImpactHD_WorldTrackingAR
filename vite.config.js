@@ -6,6 +6,6 @@ export default {
     host: "0.0.0.0",
   },
   root: "src",
-  build: { manifest: true, outDir: './dist'},
+  build: { manifest: true, outDir: '../dist'},
   publicDir: "../public",
 };
