@@ -72,6 +72,8 @@ function init() {
     })
   );
 
+  document.getElementById("place-object-btn").addEventListener("click", onSelect);
+
   // Event listeners for object selection buttons
   document.getElementById("select-flower").addEventListener("click", () => {
     event.stopPropagation();
@@ -120,7 +122,7 @@ function init() {
   }
 
   controller = renderer.xr.getController(0);
-  controller.addEventListener("select", onSelect);
+ // controller.addEventListener("select", onSelect);
   scene.add(controller);
 
   reticle = new THREE.Mesh(
