@@ -9,35 +9,25 @@ let camera, scene, renderer;
 let controller;
 
 let reticle;
-let flowersGltf;
+let flowersGltf, treesGltf; // Separate GLTF variables for each model
 
 let hitTestSource = null;
 let hitTestSourceRequested = false;
 let planeFound = false;
 
-let currentScale = 1;  // Default scale value
-let lastPlacedObject = null;  // Variable to store the last placed object
+let currentScale = 1; // Default scale value
+let lastPlacedObject = null; // Variable to store the last placed object
 
-// Get the size slider and the displayed value
-const sizeSlider = document.getElementById('size-slider');
-const sizeValue = document.getElementById('size-value');
+let selectedObject = "flower"; // Default selected object
 
-// Update scale value based on slider input
-sizeSlider.addEventListener('input', (event) => {
-  currentScale = event.target.value;
-  sizeValue.textContent = currentScale;  // Display the current scale value
-
-  // Update the scale of the last placed object (if any)
-  if (lastPlacedObject) {
-    lastPlacedObject.scale.set(currentScale, currentScale, currentScale);
-  }
-});
+// Variables for tracking pinch gestures
+let initialPinchDistance = null;
+let pinchScaling = false;
 
 // Check for WebXR session support
 if ("xr" in navigator) {
   navigator.xr.isSessionSupported("immersive-ar").then((supported) => {
     if (supported) {
-      // Hide "ar-not-supported"
       document.getElementById("ar-not-supported").style.display = "none";
       init();
       animate();
@@ -47,7 +37,6 @@ if ("xr" in navigator) {
 
 function sessionStart() {
   planeFound = false;
-  // Show #tracking-prompt
   document.getElementById("tracking-prompt").style.display = "block";
 }
 
@@ -83,35 +72,50 @@ function init() {
     })
   );
 
+  // Event listeners for object selection buttons
+  document.getElementById("select-flower").addEventListener("click", () => {
+    event.stopPropagation();
+    selectedObject = "flower";
+  });
+  document.getElementById("select-tree").addEventListener("click", () => {
+    event.stopPropagation();
+    selectedObject = "tree";
+  });
+
   function onSelect() {
-    if (reticle.visible && flowersGltf) {
-      // Pick random child from flowersGltf
-      const flower =
-        flowersGltf.children[
+    
+    
+    if (reticle.visible) {
+      let mesh;
+      if (selectedObject === "flower" && flowersGltf) {
+        const flower = flowersGltf.children[
           Math.floor(Math.random() * flowersGltf.children.length)
         ];
-      const mesh = flower.clone();
+        mesh = flower.clone();
+      } else if (selectedObject === "tree" && treesGltf) {
+        const tree = treesGltf.children[
+          Math.floor(Math.random() * treesGltf.children.length)
+        ];
+        mesh = tree.clone();
+      }
 
-      // Apply the current scale from the slider
-      mesh.scale.set(currentScale, currentScale, currentScale);
+      if (mesh) {
+        mesh.scale.set(currentScale, currentScale, currentScale);
+        reticle.matrix.decompose(mesh.position, mesh.quaternion, mesh.scale);
+        mesh.rotateY(Math.random() * Math.PI * 2);
+        scene.add(mesh);
 
-      reticle.matrix.decompose(mesh.position, mesh.quaternion, mesh.scale);
+        lastPlacedObject = mesh;
 
-      // Random rotation
-      mesh.rotateY(Math.random() * Math.PI * 2);
-      scene.add(mesh);
-
-      // Store the last placed object
-      lastPlacedObject = mesh;
-
-      // Animate growing via setInterval
-      const interval = setInterval(() => {
-        mesh.scale.multiplyScalar(1.01);
-        mesh.rotateY(0.03);
-      }, 16);
-      setTimeout(() => {
-        clearInterval(interval);
-      }, 500);
+        // Temporary scaling and rotation effect
+        const interval = setInterval(() => {
+          mesh.scale.multiplyScalar(1.01);
+          mesh.rotateY(0.03);
+        }, 16);
+        setTimeout(() => {
+          clearInterval(interval);
+        }, 500);
+      }
     }
   }
 
@@ -127,14 +131,22 @@ function init() {
   reticle.visible = false;
   scene.add(reticle);
 
-  // Load flowers.glb
   const loader = new GLTFLoader();
-
   loader.load("flowers.glb", (gltf) => {
     flowersGltf = gltf.scene;
   });
 
+  const treeLoader = new GLTFLoader();
+  treeLoader.load("Lu.glb", (gltf) => {
+    treesGltf = gltf.scene;
+  });
+
   window.addEventListener("resize", onWindowResize);
+
+  // Add touch event listeners for pinch gesture scaling
+  window.addEventListener("touchstart", onTouchStart, false);
+  window.addEventListener("touchmove", onTouchMove, false);
+  window.addEventListener("touchend", onTouchEnd, false);
 }
 
 function onWindowResize() {
@@ -189,4 +201,42 @@ function render(timestamp, frame) {
   }
 
   renderer.render(scene, camera);
+}
+
+// Touch events for pinch-to-scale
+function onTouchStart(event) {
+  if (event.touches.length === 2) {
+    pinchScaling = true;
+    initialPinchDistance = getPinchDistance(event.touches);
+  }
+}
+
+function onTouchMove(event) {
+  if (pinchScaling && event.touches.length === 2 && lastPlacedObject) {
+    const newPinchDistance = getPinchDistance(event.touches);
+    const scaleChange = newPinchDistance / initialPinchDistance;
+
+    // Scale the last placed object
+    lastPlacedObject.scale.set(
+      currentScale * scaleChange,
+      currentScale * scaleChange,
+      currentScale * scaleChange
+    );
+  }
+}
+
+function onTouchEnd(event) {
+  if (event.touches.length < 2) {
+    pinchScaling = false;
+    if (lastPlacedObject) {
+      // Update currentScale to the new scale for continuity
+      currentScale = lastPlacedObject.scale.x;
+    }
+  }
+}
+
+function getPinchDistance(touches) {
+  const dx = touches[0].pageX - touches[1].pageX;
+  const dy = touches[0].pageY - touches[1].pageY;
+  return Math.sqrt(dx * dx + dy * dy);
 }

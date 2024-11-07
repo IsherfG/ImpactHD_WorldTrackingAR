@@ -7,5 +7,6 @@ export default {
   },
   root: "src",
   build: { manifest: true, outDir: '../dist'},
+
   publicDir: "../public",
 };
