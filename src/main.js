@@ -9,20 +9,33 @@ let camera, scene, renderer;
 let controller;
 
 let reticle;
-let flowersGltf, treesGltf; // Separate GLTF variables for each model
+let flowersGltf, treesGltf;
 
 let hitTestSource = null;
 let hitTestSourceRequested = false;
 let planeFound = false;
 
-let currentScale = 1; // Default scale value
-let lastPlacedObject = null; // Variable to store the last placed object
+let currentScale = 1;
+let lastPlacedObject = null;
 
-let selectedObject = "flower"; // Default selected object
+let selectedObject = "flower";
 
 // Variables for tracking pinch gestures
 let initialPinchDistance = null;
 let pinchScaling = false;
+
+// Variables for tracking pinch rotation
+let initialPinchAngle = null;
+let pinchRotating = false;
+
+// Variables for tracking single-finger move
+let moving = false;
+let initialTouchPosition = null;
+
+// Variables for tracking three-finger Z-axis move
+let threeFingerMoving = false;
+let initialZPosition = null;
+let initialThreeFingerY = null;
 
 // Check for WebXR session support
 if ("xr" in navigator) {
@@ -74,7 +87,6 @@ function init() {
 
   document.getElementById("place-object-btn").addEventListener("click", onSelect);
 
-  // Event listeners for object selection buttons
   document.getElementById("select-flower").addEventListener("click", () => {
     event.stopPropagation();
     selectedObject = "flower";
@@ -85,8 +97,6 @@ function init() {
   });
 
   function onSelect() {
-    
-    
     if (reticle.visible) {
       let mesh;
       if (selectedObject === "flower" && flowersGltf) {
@@ -104,12 +114,15 @@ function init() {
       if (mesh) {
         mesh.scale.set(currentScale, currentScale, currentScale);
         reticle.matrix.decompose(mesh.position, mesh.quaternion, mesh.scale);
+
+        const cameraForward = new THREE.Vector3();
+        camera.getWorldDirection(cameraForward);
+        mesh.lookAt(mesh.position.clone().add(cameraForward));
         mesh.rotateY(Math.random() * Math.PI * 2);
         scene.add(mesh);
 
         lastPlacedObject = mesh;
 
-        // Temporary scaling and rotation effect
         const interval = setInterval(() => {
           mesh.scale.multiplyScalar(1.01);
           mesh.rotateY(0.03);
@@ -122,11 +135,10 @@ function init() {
   }
 
   controller = renderer.xr.getController(0);
- // controller.addEventListener("select", onSelect);
   scene.add(controller);
 
   reticle = new THREE.Mesh(
-    new THREE.RingGeometry(0.15, 0.2, 32).rotateX(-Math.PI / 2),
+    new THREE.RingGeometry(0.075, 0.1, 16).rotateX(-Math.PI / 2),
     new THREE.MeshBasicMaterial()
   );
   reticle.matrixAutoUpdate = false;
@@ -139,13 +151,12 @@ function init() {
   });
 
   const treeLoader = new GLTFLoader();
-  treeLoader.load("Lu.glb", (gltf) => {
+  treeLoader.load("Shelf.glb", (gltf) => {
     treesGltf = gltf.scene;
   });
 
   window.addEventListener("resize", onWindowResize);
 
-  // Add touch event listeners for pinch gesture scaling
   window.addEventListener("touchstart", onTouchStart, false);
   window.addEventListener("touchmove", onTouchMove, false);
   window.addEventListener("touchend", onTouchEnd, false);
@@ -205,33 +216,67 @@ function render(timestamp, frame) {
   renderer.render(scene, camera);
 }
 
-// Touch events for pinch-to-scale
 function onTouchStart(event) {
-  if (event.touches.length === 2) {
+  if (event.touches.length === 3 && lastPlacedObject) {
+    threeFingerMoving = true;
+    initialZPosition = lastPlacedObject.position.z;
+    initialThreeFingerY = event.touches[0].pageY;
+  } else if (event.touches.length === 2) {
     pinchScaling = true;
+    pinchRotating = true;
     initialPinchDistance = getPinchDistance(event.touches);
+    initialPinchAngle = getPinchAngle(event.touches);
+  } else if (event.touches.length === 1 && lastPlacedObject) {
+    moving = true;
+    initialTouchPosition = new THREE.Vector2(event.touches[0].pageX, event.touches[0].pageY);
   }
 }
 
 function onTouchMove(event) {
-  if (pinchScaling && event.touches.length === 2 && lastPlacedObject) {
+  if (event.touches.length === 3 && threeFingerMoving && lastPlacedObject) {
+    // Calculate the change in Y from the initial three-finger touch position
+    const deltaY = initialThreeFingerY - event.touches[0].pageY; // Reverse the direction
+    // Adjust the Y position of the object (up and down movement) with reduced intensity
+    lastPlacedObject.position.y = initialZPosition + deltaY * 0.005; // Reduced multiplier
+  } else if (event.touches.length === 2 && lastPlacedObject) {
     const newPinchDistance = getPinchDistance(event.touches);
-    const scaleChange = newPinchDistance / initialPinchDistance;
+    const newPinchAngle = getPinchAngle(event.touches);
 
-    // Scale the last placed object
-    lastPlacedObject.scale.set(
-      currentScale * scaleChange,
-      currentScale * scaleChange,
-      currentScale * scaleChange
-    );
+    if (pinchScaling) {
+      const scaleChange = newPinchDistance / initialPinchDistance;
+      lastPlacedObject.scale.set(
+        currentScale * scaleChange,
+        currentScale * scaleChange,
+        currentScale * scaleChange
+      );
+    }
+
+    if (pinchRotating) {
+      const angleChange = newPinchAngle - initialPinchAngle;
+      lastPlacedObject.rotation.y += angleChange;
+      initialPinchAngle = newPinchAngle;
+    }
+  } else if (event.touches.length === 1 && moving && lastPlacedObject) {
+    const currentTouchPosition = new THREE.Vector2(event.touches[0].pageX, event.touches[0].pageY);
+    const deltaX = (currentTouchPosition.x - initialTouchPosition.x) / window.innerWidth;
+    const deltaY = (currentTouchPosition.y - initialTouchPosition.y) / window.innerHeight;
+
+    const moveDirection = new THREE.Vector3(deltaX, 0, deltaY).applyQuaternion(camera.quaternion);
+    lastPlacedObject.position.add(moveDirection);
+
+    initialTouchPosition.copy(currentTouchPosition);
   }
 }
 
 function onTouchEnd(event) {
+  if (event.touches.length < 3) {
+    threeFingerMoving = false;
+  }
   if (event.touches.length < 2) {
     pinchScaling = false;
+    pinchRotating = false;
+    moving = false;
     if (lastPlacedObject) {
-      // Update currentScale to the new scale for continuity
       currentScale = lastPlacedObject.scale.x;
     }
   }
@@ -241,4 +286,10 @@ function getPinchDistance(touches) {
   const dx = touches[0].pageX - touches[1].pageX;
   const dy = touches[0].pageY - touches[1].pageY;
   return Math.sqrt(dx * dx + dy * dy);
+}
+
+function getPinchAngle(touches) {
+  const dx = touches[0].pageX - touches[1].pageX;
+  const dy = touches[0].pageY - touches[1].pageY;
+  return Math.atan2(dy, dx);
 }
