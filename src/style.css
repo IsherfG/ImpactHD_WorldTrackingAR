@@ -119,43 +119,43 @@ canvas {
 .xr-button-overlay{
   z-index: 100 !important;
 }
-
-#select-flower,
-#select-tree {
-  margin: 1rem;
-  padding: 0.5rem 1rem;
-  font-size: 1rem;
-  border: none;
-  background-color: #ffffff;
-  color: #242424;
-  border-radius: 0.3rem;
-  cursor: pointer;
+#button-container button img {
+  width: 100px; /* Adjust width as needed */
+  height: auto; /* Maintain aspect ratio */
 }
-#select-flower:hover,
-#select-tree:hover {
-  background-color: #cccccc;
-}
-
+/* General button styling */
 #button-container {
   position: absolute;
-  bottom: 100px;
+  bottom: 150px; /* Adjusted to create space for "Place Object" */
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   gap: 10px;
 }
 
-#button-container button {
-  padding: 10px 20px;
+
+
+
+
+/* Specific style for the "Place Object" button */
+#place-object-btn {
+  background-color: #04AA6D;
+  border-radius: 100%;
+  color: white;
+  padding: 20px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
   font-size: 16px;
-  cursor: pointer;
-  background-color: #007bff;
-  color: #fff;
-  border: none;
-  border-radius: 5px;
-  transition: background-color 0.3s;
+  margin: 4px 2px;
+  position: absolute;
+  bottom: -100px; /* Position near bottom */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60px; /* Width for circular shape */
+  height: 60px; 
 }
 
-#button-container button:hover {
-  background-color: #0056b3;
+#place-object-btn:hover {
+  background-color: #218838; /* Darker green on hover */
 }

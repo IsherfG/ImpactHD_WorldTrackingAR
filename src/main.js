@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { ARButton } from "three/examples/jsm/webxr/ARButton.js";
 import "./qr.js";
+
 import "./style.css";
 
 let container;
@@ -87,26 +88,55 @@ function init() {
 
   document.getElementById("place-object-btn").addEventListener("click", onSelect);
 
-  document.getElementById("select-flower").addEventListener("click", () => {
+  document.getElementById("object1").addEventListener("click", () => {
     event.stopPropagation();
-    selectedObject = "flower";
+    selectedObject = "obj1";
   });
-  document.getElementById("select-tree").addEventListener("click", () => {
+  document.getElementById("object2").addEventListener("click", () => {
     event.stopPropagation();
-    selectedObject = "tree";
+    selectedObject = "obj2";
   });
-
+  document.getElementById("object3").addEventListener("click", () => {
+    event.stopPropagation();
+    selectedObject = "obj3";
+  });
+  document.getElementById("object4").addEventListener("click", () => {
+    event.stopPropagation();
+    selectedObject = "obj4";
+  });
+  document.getElementById("object5").addEventListener("click", () => {
+    event.stopPropagation();
+    selectedObject = "obj5";
+  });
   function onSelect() {
     if (reticle.visible) {
       let mesh;
-      if (selectedObject === "flower" && flowersGltf) {
-        const flower = flowersGltf.children[
-          Math.floor(Math.random() * flowersGltf.children.length)
+      if (selectedObject === "obj1" && object1) {
+        const flower = object1.children[
+          Math.floor(Math.random() * object1.children.length)
         ];
         mesh = flower.clone();
-      } else if (selectedObject === "tree" && treesGltf) {
-        const tree = treesGltf.children[
-          Math.floor(Math.random() * treesGltf.children.length)
+      } else if (selectedObject === "obj2" && object2) {
+        const tree = object2.children[
+          Math.floor(Math.random() * object2.children.length)
+        ];
+        mesh = tree.clone();
+      }
+      else if (selectedObject === "obj3" && object3) {
+        const tree = object3.children[
+          Math.floor(Math.random() * object3.children.length)
+        ];
+        mesh = tree.clone();
+      }
+      else if (selectedObject === "obj4" && object4) {
+        const tree = object4.children[
+          Math.floor(Math.random() * object4.children.length)
+        ];
+        mesh = tree.clone();
+      }
+      else if (selectedObject === "obj5" && object5) {
+        const tree = object5.children[
+          Math.floor(Math.random() * object5.children.length)
         ];
         mesh = tree.clone();
       }
@@ -124,7 +154,7 @@ function init() {
         lastPlacedObject = mesh;
 
         const interval = setInterval(() => {
-          mesh.scale.multiplyScalar(1.01);
+          mesh.scale.multiplyScalar(0.9);
           mesh.rotateY(0.03);
         }, 16);
         setTimeout(() => {
@@ -145,15 +175,49 @@ function init() {
   reticle.visible = false;
   scene.add(reticle);
 
-  const loader = new GLTFLoader();
-  loader.load("flowers.glb", (gltf) => {
-    flowersGltf = gltf.scene;
+  const loader1 = new GLTFLoader();
+  loader1.load("Shelf.glb", (gltf) => {
+    object1 = gltf.scene;
   });
 
-  const treeLoader = new GLTFLoader();
-  treeLoader.load("Shelf.glb", (gltf) => {
-    treesGltf = gltf.scene;
+  const loader2 = new GLTFLoader();
+  loader2.load("Shelf2.glb", (gltf) => {
+    object2 = gltf.scene;
   });
+
+  const textureLoader = new THREE.TextureLoader()
+  const bagTexture = textureLoader.load("Map1.png")
+  bagTexture.flipY = false;
+  const treeLoader = new GLTFLoader();
+  treeLoader.load("Bag1.glb", (gltf) => {
+    object3 = gltf.scene;
+    object3.traverse(node => {
+      if (node.isMesh) node.material.map = bagTexture
+    })
+  });
+  
+  const textureLoader2 = new THREE.TextureLoader()
+  const bagTexture2 = textureLoader2.load("Map2.jpg")
+  bagTexture2.flipY = false;
+  const treeLoader2 = new GLTFLoader();
+  treeLoader2.load("Bag2.glb", (gltf) => {
+    object4 = gltf.scene;
+    object4.traverse(node => {
+      if (node.isMesh) node.material.map = bagTexture2
+    })
+  });
+  
+  const textureLoader3 = new THREE.TextureLoader()
+  const bagTexture3 = textureLoader3.load("Map3.png")
+  bagTexture3.flipY = false;
+  const treeLoader3 = new GLTFLoader();
+  treeLoader3.load("Bag3.glb", (gltf) => {
+    object5 = gltf.scene;
+    object5.traverse(node => {
+      if (node.isMesh) node.material.map = bagTexture3
+    })
+  });
+
 
   window.addEventListener("resize", onWindowResize);
 
@@ -202,6 +266,8 @@ function render(timestamp, frame) {
           planeFound = true;
           document.getElementById("tracking-prompt").style.display = "none";
           document.getElementById("instructions").style.display = "flex";
+
+          document.getElementById("button-container").style.display = "flex";
         }
         const hit = hitTestResults[0];
 
@@ -237,7 +303,7 @@ function onTouchMove(event) {
     // Calculate the change in Y from the initial three-finger touch position
     const deltaY = initialThreeFingerY - event.touches[0].pageY; // Reverse the direction
     // Adjust the Y position of the object (up and down movement) with reduced intensity
-    lastPlacedObject.position.y = initialZPosition + deltaY * 0.005; // Reduced multiplier
+    lastPlacedObject.position.y = initialZPosition + deltaY * 0.002; // Reduced multiplier
   } else if (event.touches.length === 2 && lastPlacedObject) {
     const newPinchDistance = getPinchDistance(event.touches);
     const newPinchAngle = getPinchAngle(event.touches);
