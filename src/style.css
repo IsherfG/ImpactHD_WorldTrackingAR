@@ -156,6 +156,24 @@ canvas {
   height: 60px; 
 }
 
+#delete-object-btn {
+  background-color: #ff0000;
+  border-radius: 100%;
+  color: white;
+  padding: 20px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 16px;
+  margin: 4px 2px;
+  position: absolute;
+  bottom: -100px; /* Position near bottom */
+  left: 80%;
+  transform: translateX(0%);
+  width: 60px; /* Width for circular shape */
+  height: 60px; 
+}
+
 #place-object-btn:hover {
   background-color: #218838; /* Darker green on hover */
 }

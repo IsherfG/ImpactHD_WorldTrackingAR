@@ -88,6 +88,16 @@ function init() {
 
   document.getElementById("place-object-btn").addEventListener("click", onSelect);
 
+
+  document.getElementById("delete-object-btn").addEventListener("click", () => {
+    if (lastPlacedObject) {
+      scene.remove(lastPlacedObject); // Remove the object from the scene
+       document.getElementById("delete-object-btn").style.display = "none"
+      lastPlacedObject = null; // Reset the lastPlacedObject reference
+      currentScale = 1; // Reset the scale for the next object
+    }
+  });
+
   document.getElementById("object1").addEventListener("click", () => {
     event.stopPropagation();
     selectedObject = "obj1";
@@ -142,6 +152,7 @@ function init() {
       }
 
       if (mesh) {
+ document.getElementById("delete-object-btn").style.display = "flex"
         mesh.scale.set(currentScale, currentScale, currentScale);
         reticle.matrix.decompose(mesh.position, mesh.quaternion, mesh.scale);
 
@@ -180,9 +191,15 @@ function init() {
     object1 = gltf.scene;
   });
 
+  const textureLoaderShelf = new THREE.TextureLoader()
+  const shelfTexture = textureLoaderShelf.load("Shelf.png")
+  shelfTexture.flipY = false;
   const loader2 = new GLTFLoader();
   loader2.load("Shelf2.glb", (gltf) => {
     object2 = gltf.scene;
+    object2.traverse(node => {
+      if (node.isMesh) node.material.map = shelfTexture
+    })
   });
 
   const textureLoader = new THREE.TextureLoader()
