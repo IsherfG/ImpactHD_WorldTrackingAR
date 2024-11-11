@@ -191,7 +191,7 @@ function init() {
     object1 = gltf.scene;
   });
 
-  const textureLoaderShelf = new THREE.TextureLoader()
+  const textureLoaderShelf = new THREE.TextureLoader() 
   const shelfTexture = textureLoaderShelf.load("Shelf.png")
   shelfTexture.flipY = false;
   const loader2 = new GLTFLoader();
