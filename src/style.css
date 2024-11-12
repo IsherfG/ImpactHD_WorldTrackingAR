@@ -120,22 +120,19 @@ canvas {
   z-index: 100 !important;
 }
 #button-container button img {
-  width: 100px; /* Adjust width as needed */
+  width: 80px; /* Reduced width for smaller screens */
   height: auto; /* Maintain aspect ratio */
 }
+
 /* General button styling */
 #button-container {
   position: absolute;
-  bottom: 150px; /* Adjusted to create space for "Place Object" */
+  bottom: 150px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   gap: 10px;
 }
-
-
-
-
 
 /* Specific style for the "Place Object" button */
 #place-object-btn {
@@ -149,11 +146,11 @@ canvas {
   font-size: 16px;
   margin: 4px 2px;
   position: absolute;
-  bottom: -100px; /* Position near bottom */
+  bottom: -100px;
   left: 50%;
   transform: translateX(-50%);
-  width: 60px; /* Width for circular shape */
-  height: 60px; 
+  width: 60px;
+  height: 60px;
 }
 
 #delete-object-btn {
@@ -167,13 +164,57 @@ canvas {
   font-size: 16px;
   margin: 4px 2px;
   position: absolute;
-  bottom: -100px; /* Position near bottom */
+  bottom: -100px;
   left: 80%;
   transform: translateX(0%);
-  width: 60px; /* Width for circular shape */
-  height: 60px; 
+  width: 60px;
+  height: 60px;
 }
 
 #place-object-btn:hover {
-  background-color: #218838; /* Darker green on hover */
+  background-color: #218838;
+}
+
+/* Responsive adjustments for smaller screens (phones) */
+@media (max-width: 768px) {
+  #button-container button img {
+    width: 60px; /* Smaller icon size for phones */
+  }
+
+  #button-container {
+    bottom: 120px; /* Adjusted bottom position */
+    gap: 5px; /* Reduce spacing between buttons */
+  }
+
+  #place-object-btn, #delete-object-btn {
+    padding: 15px;
+    font-size: 14px; /* Smaller font size */
+    width: 50px;
+    height: 50px; /* Smaller button size */
+    bottom: -80px; /* Adjusted bottom position */
+  }
+
+  #delete-object-btn {
+    left: 70%; /* Adjusted positioning for smaller screens */
+  }
+}
+
+/* Extra adjustments for very small screens (e.g., narrow phones) */
+@media (max-width: 480px) {
+  #button-container {
+    bottom: 100px;
+    gap: 5px;
+  }
+
+  #place-object-btn, #delete-object-btn {
+    padding: 12px;
+    font-size: 12px;
+    width: 45px;
+    height: 45px;
+    bottom: -70px;
+  }
+
+  #delete-object-btn {
+    left: 65%;
+  }
 }

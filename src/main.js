@@ -302,7 +302,7 @@ function render(timestamp, frame) {
 function onTouchStart(event) {
   if (event.touches.length === 3 && lastPlacedObject) {
     threeFingerMoving = true;
-    initialZPosition = lastPlacedObject.position.z;
+    initialZPosition = lastPlacedObject.position.y; // Update each time for smooth transitions
     initialThreeFingerY = event.touches[0].pageY;
   } else if (event.touches.length === 2) {
     pinchScaling = true;
@@ -348,11 +348,17 @@ function onTouchMove(event) {
     }
   } else if (event.touches.length === 1 && moving && lastPlacedObject) {
     const currentTouchPosition = new THREE.Vector2(event.touches[0].pageX, event.touches[0].pageY);
-    const deltaX = (currentTouchPosition.x - initialTouchPosition.x) / window.innerWidth;
+    const deltaX = (initialTouchPosition.x - currentTouchPosition.x) / window.innerWidth;
     const deltaY = (currentTouchPosition.y - initialTouchPosition.y) / window.innerHeight;
 
-    const moveDirection = new THREE.Vector3(deltaX, 0, deltaY).applyQuaternion(camera.quaternion);
-    lastPlacedObject.position.add(moveDirection);
+    // Create a movement vector in the object's local space based on touch input
+    const moveVector = new THREE.Vector3(deltaX, 0, -deltaY);
+
+    // Rotate the move vector to align with the camera's forward direction
+    moveVector.applyQuaternion(camera.quaternion);
+
+    // Apply the transformed movement vector to the object's position
+    lastPlacedObject.position.add(moveVector);
 
     initialTouchPosition.copy(currentTouchPosition);
   }
@@ -383,3 +389,4 @@ function getPinchAngle(touches) {
   const dy = touches[0].pageY - touches[1].pageY;
   return Math.atan2(dy, dx);
 }
+
