@@ -318,10 +318,17 @@ function onTouchStart(event) {
 function onTouchMove(event) {
   if (event.touches.length === 3 && threeFingerMoving && lastPlacedObject) {
     // Calculate the change in Y from the initial three-finger touch position
-    const deltaY = initialThreeFingerY - event.touches[0].pageY; // Reverse the direction
-    // Adjust the Y position of the object (up and down movement) with reduced intensity
-    lastPlacedObject.position.y = initialZPosition + deltaY * 0.002; // Reduced multiplier
+    const deltaY = initialThreeFingerY - event.touches[0].pageY;
+
+    // Use reduced intensity to make movement smoother
+    const moveAmount = deltaY * 0.002;
+
+    // Check for minor movement to reduce snap effect
+    if (Math.abs(moveAmount) > 0.001) {
+      lastPlacedObject.position.y = initialZPosition + moveAmount;
+    }
   } else if (event.touches.length === 2 && lastPlacedObject) {
+    // Handle pinch and rotation for two fingers
     const newPinchDistance = getPinchDistance(event.touches);
     const newPinchAngle = getPinchAngle(event.touches);
 
