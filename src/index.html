@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <title>Variant Launch ThreeJS Example - Improved</title>
+    <title>Variant Launch ThreeJS Example</title>
 
     <!-- REPLACE WITH YOUR SDK KEY TAG FROM https://launchar.app -->
     <script src="https://launchar.app/sdk/v1?key=kn2ADuXkMYN2FdWXljqrYXQJiCoeYnBg&redirect=true"></script>
@@ -17,39 +17,42 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
-    <link rel="stylesheet" href="style.css" />
   </head>
   <body>
     <div id="overlay">
-      <div id="tracking-prompt"><img src="hand.png" alt="Scan environment" /></div>
-      <div id="instructions">Scan your environment to find a surface.</div>
-      <div id="button-container" style="display: none;">
-        <button id="obj1" class="object-btn" data-ignore-tap="true">
-          <img src="Icon1.png" alt="Place Object 1" />
+      <div id="tracking-prompt"><img src="hand.png" /></div>
+      <div id="instructions">AR SEESION</div>
+      <div id="button-container" style = "display : none;">
+        <button id="object1" data-ignore-tap="true">
+          <img src="Icon1.png" alt="Place Flower" />
         </button>
-        <button id="obj2" class="object-btn" data-ignore-tap="true">
-          <img src="Icon2.png" alt="Place Object 2" />
+        <button id="object2" data-ignore-tap="true">
+          <img src="Icon2.png" alt="Place Flower" />
         </button>
-        <button id="obj3" class="object-btn" data-ignore-tap="true">
-          <img src="Icon3.png" alt="Place Object 3" />
+        <button id="object3" data-ignore-tap="true">
+          <img src="Icon3.png" alt="Place Flower" />
         </button>
-        <button id="obj4" class="object-btn" data-ignore-tap="true">
-          <img src="Icon4.png" alt="Place Object 4" />
+        <button id="object4" data-ignore-tap="true">
+          <img src="Icon4.png" alt="Place Flower" />
         </button>
-        <button id="obj5" class="object-btn" data-ignore-tap="true">
-          <img src="Icon5.png" alt="Place Object 5" />
+        <button id="object5" data-ignore-tap="true">
+          <img src="Icon5.png" alt="Place Flower" />
         </button>
-        <button id="place-object-btn" data-ignore-tap="true"></button>
-        <button id="delete-object-btn" data-ignore-tap="true" style="display: none;"></button>
+        <button id="place-object-btn"></button>
+        
+        <button id="delete-object-btn" style = "display : none;"></button>
       </div>
+    </div>
     </div>
     <div id="app">
-      <h2>商品配置 AR</h2>
+
+      <h2>商品配置</h2>
       <div id="ar-not-supported">
-        <p>AR is not supported on this browser or device. Try on a compatible mobile device.</p>
-        <img id="qr-code" src="" alt="QR Code for AR Experience" />
       </div>
     </div>
+
+    <!-- Add size control slider -->
+ 
 
     <script type="module" src="/main.js"></script>
   </body>
