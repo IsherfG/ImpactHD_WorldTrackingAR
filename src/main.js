@@ -35,7 +35,7 @@ let threeFingerMoving = false, initialZPosition = null, initialThreeFingerY = nu
 
 const raycaster = new THREE.Raycaster();
 const tapPosition = new THREE.Vector2();
-let rayDebugLine = null; // For visualizing the raycaster's ray
+let rayDebugLine = null;
 
 let selectedObject = "obj1";
 
@@ -63,7 +63,7 @@ function sessionStart() {
   document.getElementById("bottom-controls").style.display = "none";
   if (selectedForManipulationObject) deselectObject(selectedForManipulationObject);
   document.getElementById("delete-object-btn").style.display = "none";
-  if (rayDebugLine) rayDebugLine.visible = false; // Hide debug line on session start
+  if (rayDebugLine) rayDebugLine.visible = false;
 }
 
 // --- Material Management for Selection ---
@@ -158,15 +158,12 @@ function init() {
   container.appendChild(renderer.domElement);
   renderer.xr.addEventListener("sessionstart", sessionStart);
 
-  // --- RAYCASTER DEBUG VISUALIZATION ---
-  const lineMaterial = new THREE.LineBasicMaterial({ color: 0xff00ff, linewidth: 2 }); // Bright magenta
-  const points = [new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,-1)]; // Initial points
+  const lineMaterial = new THREE.LineBasicMaterial({ color: 0xff00ff, linewidth: 2 });
+  const points = [new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,-1)];
   const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
   rayDebugLine = new THREE.Line(lineGeometry, lineMaterial);
-  rayDebugLine.frustumCulled = false; // Ensure it's always drawn regardless of camera view
-  rayDebugLine.visible = false; // Initially hidden
+  rayDebugLine.frustumCulled = false; rayDebugLine.visible = false;
   scene.add(rayDebugLine);
-  // --- END RAYCASTER DEBUG ---
 
   new RGBELoader().setPath('').load(HDR_ENVIRONMENT_MAP_PATH, (texture) => {
     texture.mapping = THREE.EquirectangularReflectionMapping; scene.environment = texture;
@@ -295,7 +292,7 @@ function render(timestamp, frame) {
         allPlacedObjects.forEach(obj => scene.remove(obj));
         allPlacedObjects = []; originalMaterials.clear(); lastPlacedObject = null;
         currentScale = DEFAULT_OBJECT_SCALE;
-        if (rayDebugLine) rayDebugLine.visible = false; // Hide debug line on session end
+        if (rayDebugLine) rayDebugLine.visible = false;
       });
       hitTestSourceRequested = true;
     }
@@ -338,18 +335,21 @@ function onTouchStart(event) {
     tapPosition.x = (event.touches[0].clientX / window.innerWidth) * 2 - 1;
     tapPosition.y = -(event.touches[0].clientY / window.innerHeight) * 2 + 1;
 
-    // camera.updateMatrixWorld(); // Usually not required in WebXR frame loop
+    // --- CRUCIAL FIX FOR RAYCASTER ORIGIN ---
+    camera.updateMatrixWorld(); // Force update of camera's world matrix
+    // --- END CRUCIAL FIX ---
+
     raycaster.setFromCamera(tapPosition, camera);
 
     // --- VISUALIZE THE RAY ---
     if (rayDebugLine) {
       const rayPoints = [];
       rayPoints.push(raycaster.ray.origin.clone());
-      rayPoints.push(raycaster.ray.origin.clone().add(raycaster.ray.direction.clone().multiplyScalar(10))); // Extend ray 10 units
+      rayPoints.push(raycaster.ray.origin.clone().add(raycaster.ray.direction.clone().multiplyScalar(10)));
       rayDebugLine.geometry.setFromPoints(rayPoints);
       rayDebugLine.geometry.attributes.position.needsUpdate = true;
       rayDebugLine.visible = true;
-      setTimeout(() => { if (rayDebugLine) rayDebugLine.visible = false; }, 1000); // Hide after 1s
+      setTimeout(() => { if (rayDebugLine) rayDebugLine.visible = false; }, 1000);
     }
     // --- END VISUALIZE THE RAY ---
 
@@ -395,13 +395,7 @@ function onTouchStart(event) {
     pinchScaling = pinchRotating = moving = false;
   } else if (event.touches.length === 2) {
     pinchScaling = true; pinchRotating = true; initialPinchDistance = getPinchDistance(event.touches); initialPinchAngle = getPinchAngle(event.touches);
-    // currentScale for pinch is already set when object is selected or a previous pinch ends.
     moving = threeFingerMoving = false;
-  } else if (event.touches.length === 1 && !moving && selectedForManipulationObject) {
-    // This case is mostly for when a multi-touch gesture ends and one finger remains.
-    // Primary 1-finger tap->select->move is handled above.
-    // moving = true; initialTouchPosition = new THREE.Vector2(event.touches[0].pageX, event.touches[0].pageY);
-    // pinchScaling = pinchRotating = threeFingerMoving = false;
   }
 }
 
