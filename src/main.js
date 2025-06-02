@@ -18,10 +18,8 @@ let hitTestSourceRequested = false;
 let planeFound = false;
 
 const DEFAULT_OBJECT_SCALE = 0.2;
-let currentScale = DEFAULT_OBJECT_SCALE; // This will hold the scale for the NEXT object or current manipulated one
-let lastPlacedObject = null; // This will always point to the latest placed/interacted object for gestures
-
-// let allPlacedObjects = []; // Optional: to manage all objects for more complex interactions
+let currentScale = DEFAULT_OBJECT_SCALE;
+let lastPlacedObject = null;
 
 let selectedObject = "obj1";
 
@@ -32,7 +30,7 @@ let pinchRotating = false;
 
 let moving = false;
 let initialTouchPosition = null;
-const MOVE_SENSITIVITY = 0.0025;
+const MOVE_SENSITIVITY = 0.0025; // Adjust as needed
 
 let threeFingerMoving = false;
 let initialZPosition = null;
@@ -47,7 +45,7 @@ if ("xr" in navigator) {
     } else {
       document.getElementById("ar-not-supported").innerHTML =
         "Immersive AR not supported. Try on a compatible mobile device.";
-      const arButtonElement = document.querySelector("#ARButton") || document.querySelector(".ar-button");
+      const arButtonElement = document.querySelector("#ARButton") || document.querySelector(".ar-button"); // Example selectors
       if (arButtonElement) arButtonElement.style.display = "none";
     }
   }).catch((err) => {
@@ -95,7 +93,6 @@ function init() {
   document.getElementById("delete-object-btn").addEventListener("click", () => {
     if (lastPlacedObject) {
       scene.remove(lastPlacedObject);
-      // Basic disposal, might need more for complex objects if memory is an issue
       lastPlacedObject.traverse(child => {
         if (child.isMesh) {
           if (child.geometry) child.geometry.dispose();
@@ -105,10 +102,9 @@ function init() {
           }
         }
       });
-      // allPlacedObjects = allPlacedObjects.filter(obj => obj !== lastPlacedObject); // If using array
-      lastPlacedObject = null; // No object is actively targeted now
+      lastPlacedObject = null;
       document.getElementById("delete-object-btn").style.display = "none";
-      // currentScale = DEFAULT_OBJECT_SCALE; // Reset scale for next NEW placement (or keep it as is)
+      // currentScale = DEFAULT_OBJECT_SCALE; // Optional: reset scale for next new object
     }
   });
 
@@ -133,17 +129,11 @@ function init() {
 
         const newPosition = new THREE.Vector3();
         const newQuaternion = new THREE.Quaternion();
-        const tempScale = new THREE.Vector3(); // To absorb reticle's scale if any
+        const tempScale = new THREE.Vector3();
 
         reticle.matrix.decompose(newPosition, newQuaternion, tempScale);
         mesh.position.copy(newPosition);
         mesh.quaternion.copy(newQuaternion);
-
-        // New objects will use the `currentScale`. `currentScale` is updated
-        // by pinch gestures on the `lastPlacedObject`.
-        // If you want new objects to always be DEFAULT_OBJECT_SCALE:
-        // mesh.scale.set(DEFAULT_OBJECT_SCALE, DEFAULT_OBJECT_SCALE, DEFAULT_OBJECT_SCALE);
-        // And currentScale = DEFAULT_OBJECT_SCALE; when an object is deleted or deselected.
         mesh.scale.set(currentScale, currentScale, currentScale);
 
         const cameraLookAt = new THREE.Vector3();
@@ -151,10 +141,9 @@ function init() {
         mesh.lookAt(cameraLookAt.x, mesh.position.y, cameraLookAt.z);
 
         scene.add(mesh);
-        lastPlacedObject = mesh; // The new mesh is now the one to be manipulated
-        // allPlacedObjects.push(mesh); // If using array
+        lastPlacedObject = mesh;
 
-        const targetScaleVal = mesh.scale.x; // Animate to the scale it was just set to
+        const targetScaleVal = mesh.scale.x;
         const startAnimScaleFactor = 0.1;
         mesh.scale.set(
           targetScaleVal * startAnimScaleFactor,
@@ -254,10 +243,9 @@ function render(timestamp, frame) {
         document.getElementById("tracking-prompt").style.display = "none";
         document.getElementById("instructions").style.display = "none";
         document.getElementById("button-container").style.display = "none";
-        // Clean up all objects on session end if you used an array:
-        // allPlacedObjects.forEach(obj => scene.remove(obj));
-        // allPlacedObjects = [];
-        if (lastPlacedObject) scene.remove(lastPlacedObject); // Or just the last one
+        if (lastPlacedObject) scene.remove(lastPlacedObject);
+        // If you have an array of all objects, clean them all up here
+        // allPlacedObjects.forEach(obj => scene.remove(obj)); allPlacedObjects = [];
         lastPlacedObject = null;
         currentScale = DEFAULT_OBJECT_SCALE;
       });
@@ -294,13 +282,7 @@ function onTouchStart(event) {
     pinchScaling = true; pinchRotating = true;
     initialPinchDistance = getPinchDistance(event.touches);
     initialPinchAngle = getPinchAngle(event.touches);
-    // Capture the scale of the object we are about to pinch
-    // This currentScale is temporary for this gesture, the global currentScale
-    // is used for new object placements and updated on pinch end.
-    // Let's rename this to objectScaleAtPinchStart for clarity
-    // For now, using the global currentScale and updating it directly is fine
-    // if gestures always apply to lastPlacedObject and its scale is what currentScale tracks
-    currentScale = lastPlacedObject.scale.x; // This is correct if currentScale tracks the active object's scale
+    currentScale = lastPlacedObject.scale.x;
     moving = threeFingerMoving = false;
   } else if (event.touches.length === 1 && lastPlacedObject) {
     let targetElement = event.target; let ignoreTap = false;
@@ -323,7 +305,6 @@ function onTouchMove(event) {
   } else if (pinchScaling && event.touches.length === 2 && lastPlacedObject) {
     const newPinchDistance = getPinchDistance(event.touches);
     const scaleChange = newPinchDistance / initialPinchDistance;
-    // currentScale here is the scale of the object *at the start of this pinch*
     const newObjectScale = currentScale * scaleChange;
     lastPlacedObject.scale.set(newObjectScale, newObjectScale, newObjectScale);
     if (pinchRotating) {
@@ -333,20 +314,30 @@ function onTouchMove(event) {
     }
   } else if (moving && event.touches.length === 1 && lastPlacedObject) {
     const currentTouch = new THREE.Vector2(event.touches[0].pageX, event.touches[0].pageY);
-    const dxScreen = currentTouch.x - initialTouchPosition.x;
-    const dyScreen = currentTouch.y - initialTouchPosition.y;
+    const dxScreen = currentTouch.x - initialTouchPosition.x; // Drag R: positive, Drag L: negative
+    const dyScreen = currentTouch.y - initialTouchPosition.y; // Drag D: positive, Drag U: negative
 
-    const moveX = dxScreen * MOVE_SENSITIVITY;
-    const moveZ = dyScreen * MOVE_SENSITIVITY;
+    // To match your description:
+    // Drag R -> Object L (-dxScreen for X)
+    // Drag U -> Object BWD (dyScreen for Z if camDir is forward and positive Z is forward)
+    const moveXAmount = -dxScreen * MOVE_SENSITIVITY;
+    const moveZAmount =  dyScreen * MOVE_SENSITIVITY; // Drag U (dyScreen neg) -> moveZAmount neg (BWD if camDir is FWD)
+                                                     // Drag D (dyScreen pos) -> moveZAmount pos (FWD if camDir is FWD)
+                                                     // This seems to match: "dragging up move object backward", "dragging down move object forward"
 
-    const camDir = new THREE.Vector3(); camera.getWorldDirection(camDir);
-    camDir.y = 0; camDir.normalize();
-    const camRight = new THREE.Vector3().crossVectors(camera.up, camDir).normalize();
-    // If X is inverted, camRight.negate() or use crossVectors(camDir, camera.up)
+    const camDir = new THREE.Vector3();
+    camera.getWorldDirection(camDir);
+    camDir.y = 0; // Project onto XZ plane
+    camDir.normalize(); // This is camera's "forward" on the XZ plane
+
+    const camRight = new THREE.Vector3();
+    camRight.setFromMatrixColumn(camera.matrixWorld, 0); // Camera's local X axis in world space (camera's right)
+    camRight.y = 0; // Project onto XZ plane
+    camRight.normalize();
 
     const worldMove = new THREE.Vector3();
-    worldMove.addScaledVector(camRight, moveX);
-    worldMove.addScaledVector(camDir, moveZ); // If Z is inverted (drag down moves away vs towards), negate moveZ or camDir scaling
+    worldMove.addScaledVector(camRight, moveXAmount);
+    worldMove.addScaledVector(camDir, moveZAmount);
 
     lastPlacedObject.position.x += worldMove.x;
     lastPlacedObject.position.z += worldMove.z;
@@ -358,12 +349,12 @@ function onTouchEnd(event) {
   if (threeFingerMoving && event.touches.length < 3) threeFingerMoving = false;
   if ((pinchScaling || pinchRotating) && event.touches.length < 2) {
     if (lastPlacedObject) {
-      currentScale = lastPlacedObject.scale.x; // Update global currentScale for next placement/gesture
+      currentScale = lastPlacedObject.scale.x;
     }
     pinchScaling = false; pinchRotating = false;
   }
   if (moving && event.touches.length < 1) moving = false;
-  if (event.touches.length === 0) { // Reset all if no fingers left
+  if (event.touches.length === 0) {
     threeFingerMoving = pinchScaling = pinchRotating = moving = false;
   }
 }
