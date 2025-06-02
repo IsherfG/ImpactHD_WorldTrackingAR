@@ -2,15 +2,15 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { ARButton } from "three/examples/jsm/webxr/ARButton.js";
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
-import "./qr.js"; // Assuming this is part of your setup
-import "./style.css"; // Make sure this is linked
+import "./qr.js";
+import "./style.css";
 
 let container;
 let camera, scene, renderer;
 let controller;
 let reticle;
 
-let object1, object2, object3, object4, object5; // Loaded GLTF models
+let object1, object2, object3, object4, object5;
 
 let hitTestSource = null;
 let hitTestSourceRequested = false;
@@ -20,9 +20,8 @@ const DEFAULT_OBJECT_SCALE = 0.2;
 let currentScale = DEFAULT_OBJECT_SCALE;
 let lastPlacedObject = null;
 
-let selectedObject = "obj1"; // Default selected object ID
+let selectedObject = "obj1";
 
-// Touch gesture variables
 let initialPinchDistance = null;
 let pinchScaling = false;
 let initialPinchAngle = null;
@@ -34,10 +33,8 @@ let threeFingerMoving = false;
 let initialZPosition = null;
 let initialThreeFingerY = null;
 
-// Path to your HDR environment map
-const HDR_ENVIRONMENT_MAP_PATH = 'hdr.hdr'; // REPLACE WITH YOUR ACTUAL PATH
+const HDR_ENVIRONMENT_MAP_PATH = 'hdr.hdr';
 
-// --- UI Helper ---
 function updateSelectedObjectButton(selectedId) {
     document.querySelectorAll('.object-btn').forEach(btn => {
         btn.classList.remove('selected');
@@ -47,7 +44,6 @@ function updateSelectedObjectButton(selectedId) {
     });
 }
 
-// --- WebXR Support Check ---
 if ("xr" in navigator) {
   navigator.xr.isSessionSupported("immersive-ar").then((supported) => {
     if (supported) {
@@ -68,16 +64,14 @@ if ("xr" in navigator) {
   document.getElementById("ar-not-supported").innerHTML = "WebXR API not found. Try a modern browser.";
 }
 
-// --- AR Session Lifecycle ---
 function sessionStart() {
   planeFound = false;
   document.getElementById("tracking-prompt").style.display = "flex";
-  document.getElementById("top-bar").style.display = "none";
+  // Top bar removed, no need to hide it
   document.getElementById("bottom-controls").style.display = "none";
   document.getElementById("delete-object-btn").style.display = "none";
 }
 
-// --- Initialization ---
 function init() {
   container = document.createElement("div");
   document.body.appendChild(container);
@@ -85,7 +79,6 @@ function init() {
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
 
-  // Lighting
   const hemiLight = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 0.6);
   hemiLight.position.set(0.5, 1, 0.25);
   scene.add(hemiLight);
@@ -103,7 +96,6 @@ function init() {
   directionalLight.shadow.bias = -0.001;
   scene.add(directionalLight);
 
-  // Renderer
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(window.devicePixelRatio);
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -116,9 +108,8 @@ function init() {
   container.appendChild(renderer.domElement);
   renderer.xr.addEventListener("sessionstart", sessionStart);
 
-  // Environment Map
   new RGBELoader()
-    .setPath('') // Adjust if your HDR is in a subfolder of public, e.g., 'assets/'
+    .setPath('')
     .load(HDR_ENVIRONMENT_MAP_PATH, function (texture) {
       texture.mapping = THREE.EquirectangularReflectionMapping;
       scene.environment = texture;
@@ -127,19 +118,30 @@ function init() {
         console.error(`Could not load HDR: '${HDR_ENVIRONMENT_MAP_PATH}'. Error:`, error);
     });
 
-  // AR Button
   const arButton = ARButton.createButton(renderer, {
     requiredFeatures: ["local", "hit-test", "dom-overlay"],
     domOverlay: { root: document.querySelector("#overlay") },
   });
   document.body.appendChild(arButton);
 
-  // UI Event Listeners
   document.getElementById("place-object-btn").addEventListener("click", onSelect);
   document.getElementById("delete-object-btn").addEventListener("click", () => {
     if (lastPlacedObject) {
       scene.remove(lastPlacedObject);
-      lastPlacedObject.traverse(child => { /* ... disposal ... */ }); // Basic disposal
+      // Basic disposal
+      lastPlacedObject.traverse(child => {
+        if (child.isMesh) {
+          if (child.geometry) child.geometry.dispose();
+          if (child.material) {
+            if (Array.isArray(child.material)) child.material.forEach(mat => {
+                if(mat.map) mat.map.dispose(); mat.dispose();
+            });
+            else {
+                if(child.material.map) child.material.map.dispose(); child.material.dispose();
+            }
+          }
+        }
+      });
       lastPlacedObject = null;
       document.getElementById("delete-object-btn").style.display = "none";
     }
@@ -153,15 +155,12 @@ function init() {
         updateSelectedObjectButton(objectId);
     });
   });
-  // Initial selected object UI update
   const firstObjectButton = document.querySelector('.object-btn');
   if (firstObjectButton) {
-      selectedObject = firstObjectButton.dataset.objectId; // Set based on first button
+      selectedObject = firstObjectButton.dataset.objectId;
       updateSelectedObjectButton(selectedObject);
   }
 
-
-  // Reticle
   reticle = new THREE.Mesh(
     new THREE.RingGeometry(0.075, 0.1, 24).rotateX(-Math.PI / 2),
     new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6, side: THREE.DoubleSide })
@@ -170,7 +169,6 @@ function init() {
   reticle.visible = false;
   scene.add(reticle);
 
-  // GLTF Loading
   const gltfLoader = new GLTFLoader();
   const textureLoader = new THREE.TextureLoader();
   const loadErrorCallback = (name) => (error) => console.error(`Error loading ${name}:`, error);
@@ -178,56 +176,43 @@ function init() {
   function applyTextureToGLTF(gltfScene, texture) {
     gltfScene.traverse(node => {
         if (node.isMesh) {
-            // It's often better to create a new material instance or clone
-            // to avoid sharing materials if the same GLTF is loaded multiple times
-            // or if its original material is complex.
             let newMaterial;
-            if (node.material && node.material.isMeshStandardMaterial) {
-                newMaterial = node.material.clone();
-            } else {
-                newMaterial = new THREE.MeshStandardMaterial(); // Basic fallback
-                if (node.material && node.material.color) {
-                    newMaterial.color.copy(node.material.color);
-                }
+            if (node.material && node.material.isMeshStandardMaterial) newMaterial = node.material.clone();
+            else {
+                newMaterial = new THREE.MeshStandardMaterial();
+                if (node.material && node.material.color) newMaterial.color.copy(node.material.color);
             }
             newMaterial.map = texture;
-            newMaterial.needsUpdate = true; // Important if replacing material
+            newMaterial.needsUpdate = true;
             node.material = newMaterial;
         }
     });
   }
 
   gltfLoader.load("Shelf.glb", (gltf) => { object1 = gltf.scene; }, undefined, loadErrorCallback("Shelf.glb"));
-
   textureLoader.load("Shelf.png", (texture) => {
     texture.flipY = false; texture.encoding = THREE.sRGBEncoding;
     gltfLoader.load("Shelf2.glb", (gltf) => { object2 = gltf.scene; applyTextureToGLTF(object2, texture);}, undefined, loadErrorCallback("Shelf2.glb"));
   }, undefined, loadErrorCallback("Shelf.png"));
-
   textureLoader.load("Map1.png", (texture) => {
     texture.flipY = false; texture.encoding = THREE.sRGBEncoding;
     gltfLoader.load("Bag1.glb", (gltf) => { object3 = gltf.scene; applyTextureToGLTF(object3, texture);}, undefined, loadErrorCallback("Bag1.glb"));
   }, undefined, loadErrorCallback("Map1.png"));
-
   textureLoader.load("Map2.jpg", (texture) => {
     texture.flipY = false; texture.encoding = THREE.sRGBEncoding;
     gltfLoader.load("Bag2.glb", (gltf) => { object4 = gltf.scene; applyTextureToGLTF(object4, texture);}, undefined, loadErrorCallback("Bag2.glb"));
   }, undefined, loadErrorCallback("Map2.jpg"));
-
   textureLoader.load("Map3.png", (texture) => {
     texture.flipY = false; texture.encoding = THREE.sRGBEncoding;
     gltfLoader.load("Bag3.glb", (gltf) => { object5 = gltf.scene; applyTextureToGLTF(object5, texture);}, undefined, loadErrorCallback("Bag3.glb"));
   }, undefined, loadErrorCallback("Map3.png"));
 
-
   window.addEventListener("resize", onWindowResize);
-  // Touch Listeners
   window.addEventListener("touchstart", onTouchStart, { passive: false });
   window.addEventListener("touchmove", onTouchMove, { passive: false });
   window.addEventListener("touchend", onTouchEnd, false);
 }
 
-// --- Object Placement ---
 function onSelect() {
   if (reticle.visible) {
     let modelToClone;
@@ -241,16 +226,11 @@ function onSelect() {
       const mesh = modelToClone.clone();
       mesh.castShadow = true;
       mesh.receiveShadow = true;
-      mesh.traverse(child => {
-          if (child.isMesh) {
-              child.castShadow = true;
-              child.receiveShadow = true;
-          }
-      });
+      mesh.traverse(child => { if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; }});
 
       const newPosition = new THREE.Vector3();
       const newQuaternion = new THREE.Quaternion();
-      reticle.matrix.decompose(newPosition, newQuaternion, new THREE.Vector3()); // Temp scale vec
+      reticle.matrix.decompose(newPosition, newQuaternion, new THREE.Vector3());
       mesh.position.copy(newPosition);
       mesh.quaternion.copy(newQuaternion);
       mesh.scale.set(currentScale, currentScale, currentScale);
@@ -261,9 +241,8 @@ function onSelect() {
 
       scene.add(mesh);
       lastPlacedObject = mesh;
-      document.getElementById("delete-object-btn").style.display = "flex"; // Show delete button
+      document.getElementById("delete-object-btn").style.display = "flex";
 
-      // Entry animation
       const targetScaleVal = mesh.scale.x;
       mesh.scale.setScalar(targetScaleVal * 0.1);
       const animStartTime = performance.now();
@@ -280,20 +259,16 @@ function onSelect() {
   }
 }
 
-
-// --- Window Resize ---
 function onWindowResize() {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-// --- Animation Loop ---
 function animate() {
   renderer.setAnimationLoop(render);
 }
 
-// --- Render Loop ---
 function render(timestamp, frame) {
   if (frame) {
     const referenceSpace = renderer.xr.getReferenceSpace();
@@ -309,7 +284,7 @@ function render(timestamp, frame) {
       session.addEventListener("end", () => {
         hitTestSourceRequested = false; hitTestSource = null; planeFound = false;
         document.getElementById("tracking-prompt").style.display = "none";
-        document.getElementById("top-bar").style.display = "none";
+        // Top bar removed
         document.getElementById("bottom-controls").style.display = "none";
         if (lastPlacedObject) scene.remove(lastPlacedObject);
         lastPlacedObject = null; currentScale = DEFAULT_OBJECT_SCALE;
@@ -323,9 +298,10 @@ function render(timestamp, frame) {
         if (!planeFound) {
           planeFound = true;
           document.getElementById("tracking-prompt").style.display = "none";
-          document.getElementById("top-bar").style.display = "flex";
+          // Top bar removed
           document.getElementById("bottom-controls").style.display = "flex";
-          document.getElementById("instruction-text").textContent = "Tap reticle to place";
+          // If you want an instruction elsewhere, you'd need a new element or re-purpose one.
+          // For now, the UI appearing is the main feedback.
         }
         const hit = hitTestResults[0];
         const pose = hit.getPose(referenceSpace);
@@ -337,7 +313,6 @@ function render(timestamp, frame) {
   renderer.render(scene, camera);
 }
 
-// --- Touch Event Handlers ---
 function onTouchStart(event) {
   if (event.touches.length === 3 && lastPlacedObject) {
     threeFingerMoving = true;
@@ -348,16 +323,7 @@ function onTouchStart(event) {
     pinchScaling = true; pinchRotating = true;
     initialPinchDistance = getPinchDistance(event.touches);
     initialPinchAngle = getPinchAngle(event.touches);
-    // Capture the scale of the object AT THE START of this specific pinch gesture
-    // This is NOT necessarily the global `currentScale` (which is for new objects)
-    // Let's use a temporary variable or just use lastPlacedObject.scale.x directly in onTouchMove
-    // For now, using currentScale here means the pinch is relative to the scale of the *last action*
-    // If last action was placing a new obj, currentScale = DEFAULT_OBJECT_SCALE (or last pinch scale)
-    // If last action was pinching another obj, currentScale = that obj's final scale
-    // To make pinch always relative to *this* object's current scale:
-    // No, currentScale IS updated in onTouchEnd, so this is correct: it captures the scale
-    // of the currently active object before this new pinch starts.
-    currentScale = lastPlacedObject.scale.x; // This is the scale to be modified by this pinch
+    currentScale = lastPlacedObject.scale.x;
     moving = threeFingerMoving = false;
   } else if (event.touches.length === 1 && lastPlacedObject) {
     let targetElement = event.target; let ignoreTap = false;
@@ -373,7 +339,7 @@ function onTouchStart(event) {
         initialTouchPosition = new THREE.Vector2(event.touches[0].pageX, event.touches[0].pageY);
         pinchScaling = pinchRotating = threeFingerMoving = false;
     } else {
-        moving = false; // Ensure moving is false if tap is on UI
+        moving = false;
     }
   }
 }
@@ -385,7 +351,6 @@ function onTouchMove(event) {
   } else if (pinchScaling && event.touches.length === 2 && lastPlacedObject) {
     const newPinchDistance = getPinchDistance(event.touches);
     const scaleChange = newPinchDistance / initialPinchDistance;
-    // `currentScale` here is the object's scale at the START of THIS pinch.
     const newObjectScale = currentScale * scaleChange;
     lastPlacedObject.scale.set(newObjectScale, newObjectScale, newObjectScale);
     if (pinchRotating) {
@@ -399,16 +364,16 @@ function onTouchMove(event) {
     const dyScreen = currentTouch.y - initialTouchPosition.y;
 
     const cameraRight = new THREE.Vector3();
-    cameraRight.setFromMatrixColumn(camera.matrixWorld, 0); // X-axis
+    cameraRight.setFromMatrixColumn(camera.matrixWorld, 0);
     cameraRight.y = 0; cameraRight.normalize();
 
     const cameraForward = new THREE.Vector3();
-    cameraForward.setFromMatrixColumn(camera.matrixWorld, 2); // Z-axis
-    cameraForward.negate(); // Camera looks down -Z
+    cameraForward.setFromMatrixColumn(camera.matrixWorld, 2);
+    cameraForward.negate();
     cameraForward.y = 0; cameraForward.normalize();
 
     const worldMoveX = cameraRight.clone().multiplyScalar(dxScreen * MOVE_SENSITIVITY);
-    const worldMoveZ = cameraForward.clone().multiplyScalar(-dyScreen * MOVE_SENSITIVITY); // Drag UP -> Away
+    const worldMoveZ = cameraForward.clone().multiplyScalar(-dyScreen * MOVE_SENSITIVITY);
 
     lastPlacedObject.position.add(worldMoveX);
     lastPlacedObject.position.add(worldMoveZ);
@@ -420,14 +385,12 @@ function onTouchEnd(event) {
   if (threeFingerMoving && event.touches.length < 3) threeFingerMoving = false;
   if ((pinchScaling || pinchRotating) && event.touches.length < 2) {
     if (lastPlacedObject) {
-      // Update the global currentScale to this object's final scale,
-      // so the *next* placed object can inherit it if desired.
       currentScale = lastPlacedObject.scale.x;
     }
     pinchScaling = false; pinchRotating = false;
   }
   if (moving && event.touches.length < 1) moving = false;
-  if (event.touches.length === 0) { // Reset all flags if all fingers up
+  if (event.touches.length === 0) {
     threeFingerMoving = pinchScaling = pinchRotating = moving = false;
   }
 }
