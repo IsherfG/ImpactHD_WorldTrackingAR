@@ -158,11 +158,12 @@ function init() {
   container.appendChild(renderer.domElement);
   renderer.xr.addEventListener("sessionstart", sessionStart);
 
-  const lineMaterial = new THREE.LineBasicMaterial({ color: 0xff00ff, linewidth: 2 });
+  // MODIFICATION: Make rayDebugLine thicker
+  const lineMaterial = new THREE.LineBasicMaterial({ color: 0xff00ff, linewidth: 5 }); // Increased linewidth from 2 to 5
   const points = [new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,-1)];
   const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
   rayDebugLine = new THREE.Line(lineGeometry, lineMaterial);
-  rayDebugLine.frustumCulled = false; rayDebugLine.visible = false;
+  rayDebugLine.frustumCulled = false; rayDebugLine.visible = false; // Initially not visible
   scene.add(rayDebugLine);
 
   new RGBELoader().setPath('').load(HDR_ENVIRONMENT_MAP_PATH, (texture) => {
@@ -292,7 +293,7 @@ function render(timestamp, frame) {
         allPlacedObjects.forEach(obj => scene.remove(obj));
         allPlacedObjects = []; originalMaterials.clear(); lastPlacedObject = null;
         currentScale = DEFAULT_OBJECT_SCALE;
-        if (rayDebugLine) rayDebugLine.visible = false;
+        if (rayDebugLine) rayDebugLine.visible = false; // Hide ray on session end
       });
       hitTestSourceRequested = true;
     }
@@ -335,26 +336,24 @@ function onTouchStart(event) {
     tapPosition.x = (event.touches[0].clientX / window.innerWidth) * 2 - 1;
     tapPosition.y = -(event.touches[0].clientY / window.innerHeight) * 2 + 1;
 
-    // --- CRUCIAL FIX FOR RAYCASTER ORIGIN ---
-    camera.updateMatrixWorld(); // Force update of camera's world matrix
-    // --- END CRUCIAL FIX ---
-
+    camera.updateMatrixWorld();
     raycaster.setFromCamera(tapPosition, camera);
 
     // --- VISUALIZE THE RAY ---
     if (rayDebugLine) {
       const rayPoints = [];
       rayPoints.push(raycaster.ray.origin.clone());
-      rayPoints.push(raycaster.ray.origin.clone().add(raycaster.ray.direction.clone().multiplyScalar(10)));
+      // MODIFICATION: Make rayDebugLine longer
+      rayPoints.push(raycaster.ray.origin.clone().add(raycaster.ray.direction.clone().multiplyScalar(50))); // Increased length from 10 to 50
       rayDebugLine.geometry.setFromPoints(rayPoints);
       rayDebugLine.geometry.attributes.position.needsUpdate = true;
       rayDebugLine.visible = true;
-      setTimeout(() => { if (rayDebugLine) rayDebugLine.visible = false; }, 1000);
+      // MODIFICATION: Remove setTimeout to make it "permanent" (shows last ray)
+      // setTimeout(() => { if (rayDebugLine) rayDebugLine.visible = false; }, 1000); 
     }
     // --- END VISUALIZE THE RAY ---
 
     const intersects = raycaster.intersectObjects(allPlacedObjects, true);
-    // console.log("Intersects:", intersects.length, intersects.map(i => i.object.name ? i.object.name : (i.object.parent ? i.object.parent.name : "Unknown"))); // DEBUG
 
     if (intersects.length > 0) {
       let intersectedMesh = intersects[0].object;
@@ -368,8 +367,6 @@ function onTouchStart(event) {
         tempCurrent = tempCurrent.parent;
       }
       
-      // console.log("Tapped Object Root:", tappedObjectRoot ? tappedObjectRoot.name : "None"); // DEBUG
-
       if (tappedObjectRoot) {
           if (selectedForManipulationObject === tappedObjectRoot) {
               moving = true; initialTouchPosition = new THREE.Vector2(event.touches[0].pageX, event.touches[0].pageY);
@@ -379,11 +376,9 @@ function onTouchStart(event) {
           }
           pinchScaling = pinchRotating = threeFingerMoving = false; return;
       } else {
-          // console.log("Intersection found, but not with a tracked root object. Deselecting if any."); // DEBUG
           if (selectedForManipulationObject) deselectObject(selectedForManipulationObject);
       }
     } else {
-      // console.log("No intersection with placed objects. Deselecting if any."); // DEBUG
       if (selectedForManipulationObject) deselectObject(selectedForManipulationObject);
     }
   }
@@ -424,7 +419,7 @@ function onTouchMove(event) {
     const cameraForward = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 2); cameraForward.negate(); cameraForward.y=0; cameraForward.normalize();
 
     const worldMoveX = cameraRight.clone().multiplyScalar(dxScreen * MOVE_SENSITIVITY);
-    const worldMoveZ = cameraForward.clone().multiplyScalar(-dyScreen * MOVE_SENSITIVITY);
+    const worldMoveZ = cameraForward.clone().multiplyScalar(-dyScreen * MOVE_SENSITIVITY); // Changed dyScreen to -dyScreen for more natural up/down drag
 
     selectedForManipulationObject.position.add(worldMoveX);
     selectedForManipulationObject.position.add(worldMoveZ);
@@ -443,6 +438,8 @@ function onTouchEnd(event) {
   if (moving && event.touches.length < 1) moving = false;
   if (event.touches.length === 0) {
     threeFingerMoving = pinchScaling = pinchRotating = moving = false;
+    // Optionally, you could hide the rayDebugLine here if no interaction is active:
+    // if (rayDebugLine && !selectedForManipulationObject) rayDebugLine.visible = false;
   }
 }
 
