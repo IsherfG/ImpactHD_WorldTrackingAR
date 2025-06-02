@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { ARButton } from "three/examples/jsm/webxr/ARButton.js";
-import "./qr.js"; // Assuming qr.js is necessary for your setup
+import "./qr.js";
 
 import "./style.css";
 
@@ -11,7 +11,7 @@ let controller;
 
 let reticle;
 
-let object1, object2, object3, object4, object5; // To store loaded GLTF scenes
+let object1, object2, object3, object4, object5;
 
 let hitTestSource = null;
 let hitTestSourceRequested = false;
@@ -30,7 +30,7 @@ let pinchRotating = false;
 
 let moving = false;
 let initialTouchPosition = null;
-const MOVE_SENSITIVITY = 0.0025; // Adjust as needed
+const MOVE_SENSITIVITY = 0.002; // Adjusted sensitivity, might need tuning
 
 let threeFingerMoving = false;
 let initialZPosition = null;
@@ -45,7 +45,7 @@ if ("xr" in navigator) {
     } else {
       document.getElementById("ar-not-supported").innerHTML =
         "Immersive AR not supported. Try on a compatible mobile device.";
-      const arButtonElement = document.querySelector("#ARButton") || document.querySelector(".ar-button"); // Example selectors
+      const arButtonElement = document.querySelector("#ARButton") || document.querySelector(".ar-button");
       if (arButtonElement) arButtonElement.style.display = "none";
     }
   }).catch((err) => {
@@ -104,7 +104,6 @@ function init() {
       });
       lastPlacedObject = null;
       document.getElementById("delete-object-btn").style.display = "none";
-      // currentScale = DEFAULT_OBJECT_SCALE; // Optional: reset scale for next new object
     }
   });
 
@@ -244,8 +243,6 @@ function render(timestamp, frame) {
         document.getElementById("instructions").style.display = "none";
         document.getElementById("button-container").style.display = "none";
         if (lastPlacedObject) scene.remove(lastPlacedObject);
-        // If you have an array of all objects, clean them all up here
-        // allPlacedObjects.forEach(obj => scene.remove(obj)); allPlacedObjects = [];
         lastPlacedObject = null;
         currentScale = DEFAULT_OBJECT_SCALE;
       });
@@ -314,33 +311,53 @@ function onTouchMove(event) {
     }
   } else if (moving && event.touches.length === 1 && lastPlacedObject) {
     const currentTouch = new THREE.Vector2(event.touches[0].pageX, event.touches[0].pageY);
-    const dxScreen = currentTouch.x - initialTouchPosition.x; // Drag R: positive, Drag L: negative
-    const dyScreen = currentTouch.y - initialTouchPosition.y; // Drag D: positive, Drag U: negative
+    const dxScreen = currentTouch.x - initialTouchPosition.x; // Positive: drag right
+    const dyScreen = currentTouch.y - initialTouchPosition.y; // Positive: drag down
 
-    // To match your description:
-    // Drag R -> Object L (-dxScreen for X)
-    // Drag U -> Object BWD (dyScreen for Z if camDir is forward and positive Z is forward)
-    const moveXAmount = -dxScreen * MOVE_SENSITIVITY;
-    const moveZAmount =  dyScreen * MOVE_SENSITIVITY; // Drag U (dyScreen neg) -> moveZAmount neg (BWD if camDir is FWD)
-                                                     // Drag D (dyScreen pos) -> moveZAmount pos (FWD if camDir is FWD)
-                                                     // This seems to match: "dragging up move object backward", "dragging down move object forward"
+    // Get camera's local X-axis (Right vector) in world space
+    const cameraRight = new THREE.Vector3();
+    cameraRight.setFromMatrixColumn(camera.matrixWorld, 0); // Column 0 is X-axis
+    cameraRight.y = 0; // Project onto XZ plane
+    cameraRight.normalize();
 
-    const camDir = new THREE.Vector3();
-    camera.getWorldDirection(camDir);
-    camDir.y = 0; // Project onto XZ plane
-    camDir.normalize(); // This is camera's "forward" on the XZ plane
+    // Get camera's local Z-axis (Forward/LookAt vector) in world space
+    // Cameras look down their negative Z-axis. So, the "forward" direction of view is -Z.
+    const cameraForward = new THREE.Vector3();
+    cameraForward.setFromMatrixColumn(camera.matrixWorld, 2); // Column 2 is Z-axis
+    cameraForward.negate(); // Negate because camera looks down -Z. Now cameraForward points where camera is looking.
+    cameraForward.y = 0; // Project onto XZ plane
+    cameraForward.normalize();
 
-    const camRight = new THREE.Vector3();
-    camRight.setFromMatrixColumn(camera.matrixWorld, 0); // Camera's local X axis in world space (camera's right)
-    camRight.y = 0; // Project onto XZ plane
-    camRight.normalize();
+    // Calculate world space movement amounts
+    // Drag Right (dxScreen > 0) => Move along positive cameraRight
+    const worldMoveX = cameraRight.clone().multiplyScalar(dxScreen * MOVE_SENSITIVITY);
 
-    const worldMove = new THREE.Vector3();
-    worldMove.addScaledVector(camRight, moveXAmount);
-    worldMove.addScaledVector(camDir, moveZAmount);
+    // Drag Down (dyScreen > 0) => Move along positive cameraForward (CLOSER)
+    // Drag Up   (dyScreen < 0) => Move along negative cameraForward (AWAY)
+    // To make Drag Up move AWAY (negative cameraForward) and Drag Down move CLOSER (positive cameraForward),
+    // we need dyScreen to contribute POSITIVELY to cameraForward when dragging DOWN,
+    // and NEGATIVELY when dragging UP.
+    // So, if dyScreen is positive (drag down), movement is along +cameraForward.
+    // If dyScreen is negative (drag up), movement is along -cameraForward.
+    // This means `dyScreen` is used directly.
+    // HOWEVER, if you want "Drag UP on screen -> Object moves AWAY" (which is intuitive),
+    // and "Drag DOWN on screen -> Object moves CLOSER", then:
+    // - Drag UP means dyScreen is NEGATIVE. To move AWAY (along negative cameraForward), we need a POSITIVE factor for -cameraForward.
+    //   Or, a NEGATIVE factor for +cameraForward. So, `dyScreen` as is.
+    // - Let's re-state: desired UP drag (-dyScreen) -> AWAY (movement in -cameraForward direction)
+    //   desired DOWN drag (+dyScreen) -> CLOSER (movement in +cameraForward direction)
+    //   This means the scaling factor for `cameraForward` should be `dyScreen`.
+    //   If it feels inverted (up moves closer), then use `-dyScreen`.
 
-    lastPlacedObject.position.x += worldMove.x;
-    lastPlacedObject.position.z += worldMove.z;
+    const worldMoveZ = cameraForward.clone().multiplyScalar(dyScreen * MOVE_SENSITIVITY);
+    // Test: if Z is still inverted (e.g. drag up moves closer), use:
+    // const worldMoveZ = cameraForward.clone().multiplyScalar(-dyScreen * MOVE_SENSITIVITY);
+
+
+    // Combine movements
+    lastPlacedObject.position.add(worldMoveX);
+    lastPlacedObject.position.add(worldMoveZ);
+
     initialTouchPosition.copy(currentTouch);
   }
 }
