@@ -7,7 +7,7 @@ import "./style.css";
 
 // --- Global Variables ---
 let container;
-let camera, scene, renderer;
+let camera, scene, renderer; // camera is the main scene camera
 let controller;
 let reticle;
 
@@ -67,7 +67,7 @@ function sessionStart() {
 }
 
 // --- Material Management for Selection ---
-function storeOriginalMaterials(object) {
+function storeOriginalMaterials(object) { /* ... (same as before) ... */
     if (originalMaterials.has(object)) return;
     const materialsToStore = [];
     object.traverse(child => {
@@ -79,8 +79,7 @@ function storeOriginalMaterials(object) {
     });
     originalMaterials.set(object, materialsToStore);
 }
-
-function restoreOriginalMaterials(object) {
+function restoreOriginalMaterials(object) { /* ... (same as before) ... */
     if (originalMaterials.has(object)) {
         const materialsInfo = originalMaterials.get(object);
         materialsInfo.forEach(info => {
@@ -91,8 +90,7 @@ function restoreOriginalMaterials(object) {
         });
     }
 }
-
-function highlightSelectedObject(object) {
+function highlightSelectedObject(object) { /* ... (same as before) ... */
     storeOriginalMaterials(object);
     object.traverse(child => {
         if (child.isMesh && child.material) {
@@ -101,26 +99,22 @@ function highlightSelectedObject(object) {
                  child.material.dispose();
             }
             const highlightMaterial = new THREE.MeshStandardMaterial({
-                color: SELECTION_COLOR,
-                emissive: SELECTION_COLOR,
-                emissiveIntensity: 0.4,
+                color: SELECTION_COLOR, emissive: SELECTION_COLOR, emissiveIntensity: 0.4,
                 map: originalChildMaterial?.map || null,
             });
             child.material = highlightMaterial;
         }
     });
 }
-
-function selectObject(object) {
+function selectObject(object) { /* ... (same as before, uses global currentScale) ... */
     if (selectedForManipulationObject === object) return;
     if (selectedForManipulationObject) deselectObject(selectedForManipulationObject);
     selectedForManipulationObject = object;
     highlightSelectedObject(object);
     document.getElementById("delete-object-btn").style.display = "flex";
-    currentScale = selectedForManipulationObject.scale.x;
+    currentScale = selectedForManipulationObject.scale.x; // Update currentScale for pinch gestures
 }
-
-function deselectObject(object) {
+function deselectObject(object) { /* ... (same as before) ... */
     if (!object) return;
     restoreOriginalMaterials(object);
     if (selectedForManipulationObject === object) {
@@ -133,6 +127,7 @@ function deselectObject(object) {
 function init() {
   container = document.createElement("div"); document.body.appendChild(container);
   scene = new THREE.Scene();
+  // This 'camera' is the one we pass to the renderer. In AR mode, its pose is updated by XR.
   camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
 
   const hemiLight = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 0.6); scene.add(hemiLight);
@@ -177,7 +172,7 @@ function init() {
   document.body.appendChild(arButton);
 
   document.getElementById("place-object-btn").addEventListener("click", onSelect);
-  document.getElementById("delete-object-btn").addEventListener("click", () => {
+  document.getElementById("delete-object-btn").addEventListener("click", () => { /* ... (same as before) ... */
     if (selectedForManipulationObject) {
       scene.remove(selectedForManipulationObject);
       allPlacedObjects = allPlacedObjects.filter(obj => obj !== selectedForManipulationObject);
@@ -196,7 +191,7 @@ function init() {
     }
   });
 
-  document.querySelectorAll('.object-btn').forEach(button => {
+  document.querySelectorAll('.object-btn').forEach(button => { /* ... (same as before) ... */
     button.addEventListener('click', (event) => {
         event.stopPropagation(); selectedObject = button.dataset.objectId; updateSelectedObjectButton(selectedObject);
     });
@@ -204,7 +199,8 @@ function init() {
   const firstObjBtn = document.querySelector('.object-btn');
   if(firstObjBtn){ selectedObject = firstObjBtn.dataset.objectId; updateSelectedObjectButton(selectedObject); }
 
-  reticle = new THREE.Mesh(
+
+  reticle = new THREE.Mesh( /* ... (same as before) ... */
     new THREE.RingGeometry(0.075, 0.1, 24).rotateX(-Math.PI / 2),
     new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6, side: THREE.DoubleSide })
   );
@@ -212,7 +208,7 @@ function init() {
 
   const gltfLoader = new GLTFLoader(); const textureLoader = new THREE.TextureLoader();
   const loadErrCb = (name)=>(e)=>console.error(`Err load ${name}`,e);
-  function applyTex(gltfScn, tex){ gltfScn.traverse(n=>{if(n.isMesh){let m; if(n.material?.isMeshStandardMaterial)m=n.material.clone();else{m=new THREE.MeshStandardMaterial();if(n.material?.color)m.color.copy(n.material.color);} m.map=tex;m.needsUpdate=true;n.material=m;}}); }
+  function applyTex(gltfScn, tex){ /* ... (same as before) ... */ gltfScn.traverse(n=>{if(n.isMesh){let m; if(n.material?.isMeshStandardMaterial)m=n.material.clone();else{m=new THREE.MeshStandardMaterial();if(n.material?.color)m.color.copy(n.material.color);} m.map=tex;m.needsUpdate=true;n.material=m;}}); }
 
   gltfLoader.load("Shelf.glb", (g) => { object1 = g.scene; if(object1) object1.name = "Shelf_GLTF_Root"; }, undefined, loadErrCb("Shelf.glb"));
   textureLoader.load("Shelf.png", (t) => { t.flipY=false; t.encoding=THREE.sRGBEncoding; gltfLoader.load("Shelf2.glb", (g) => { object2=g.scene; if(object2){ object2.name = "Shelf2_GLTF_Root"; applyTex(object2,t);} }, undefined, loadErrCb("Shelf2.glb")); }, undefined, loadErrCb("Shelf.png"));
@@ -226,7 +222,7 @@ function init() {
   window.addEventListener("touchend", onTouchEnd, false);
 }
 
-function onSelect() {
+function onSelect() { /* ... (same as before) ... */
   if (reticle.visible) {
     let modelToClone;
     if (selectedObject === "obj1" && object1) modelToClone = object1;
@@ -272,10 +268,10 @@ function onSelect() {
   }
 }
 
-function onWindowResize() { camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); }
-function animate() { renderer.setAnimationLoop(render); }
+function onWindowResize() { /* ... (same as before) ... */ camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); }
+function animate() { /* ... (same as before) ... */ renderer.setAnimationLoop(render); }
 
-function render(timestamp, frame) {
+function render(timestamp, frame) { /* ... (same as before) ... */
   if (frame) {
     const referenceSpace = renderer.xr.getReferenceSpace(); const session = renderer.xr.getSession();
     if (hitTestSourceRequested === false && session) {
@@ -310,7 +306,7 @@ function render(timestamp, frame) {
         } else { reticle.visible = false; }
     }
   }
-  renderer.render(scene, camera);
+  renderer.render(scene, camera); // camera here is your global camera, updated by XR
 }
 
 function onTouchStart(event) {
@@ -327,7 +323,7 @@ function onTouchStart(event) {
     currentElement = currentElement.parentElement;
   }
 
-  // console.log("Tap Target:", event.target.id || event.target.className, "Is UI Tap:", uiTap, "Touches:", event.touches.length); // DEBUG
+  // console.log("Tap Target:", event.target.id || event.target.className, "Is UI Tap:", uiTap); // DEBUG
 
   if (uiTap) { moving = pinchScaling = pinchRotating = threeFingerMoving = false; return; }
 
@@ -335,23 +331,41 @@ function onTouchStart(event) {
     tapPosition.x = (event.touches[0].clientX / window.innerWidth) * 2 - 1;
     tapPosition.y = -(event.touches[0].clientY / window.innerHeight) * 2 + 1;
 
-    // --- CRUCIAL FIX FOR RAYCASTER ORIGIN ---
-    camera.updateMatrixWorld(); // Force update of camera's world matrix
-    // --- END CRUCIAL FIX ---
+    // --- ATTEMPT TO USE THE CORRECT AR CAMERA FOR RAYCASTING ---
+    let raycastingCamera = camera; // Default to the global camera instance
 
-    raycaster.setFromCamera(tapPosition, camera);
+    if (renderer.xr.isPresenting && renderer.xr.getCamera) {
+        const xrCameraGroup = renderer.xr.getCamera(); // This is often a Group or ArrayCamera
+        if (xrCameraGroup.isPerspectiveCamera) { // If it's directly the camera
+            raycastingCamera = xrCameraGroup;
+        } else if (xrCameraGroup.cameras && xrCameraGroup.cameras.length > 0) { // If it's an ArrayCamera
+            raycastingCamera = xrCameraGroup.cameras[0];
+        }
+        // If it's a Group containing the camera, you might need to find it by name or type:
+        // else if (xrCameraGroup.isGroup) {
+        //     xrCameraGroup.traverse(child => {
+        //         if (child.isPerspectiveCamera) raycastingCamera = child;
+        //     });
+        // }
+        // console.log("Using XR camera for raycast:", raycastingCamera.uuid, "Global camera:", camera.uuid); // DEBUG
+    }
+    raycastingCamera.updateMatrixWorld(true); // Force update matrix of the camera used for raycasting
+    // --- END ATTEMPT ---
 
-    // --- VISUALIZE THE RAY ---
+    raycaster.setFromCamera(tapPosition, raycastingCamera);
+
     if (rayDebugLine) {
       const rayPoints = [];
-      rayPoints.push(raycaster.ray.origin.clone());
-      rayPoints.push(raycaster.ray.origin.clone().add(raycaster.ray.direction.clone().multiplyScalar(10)));
+      const rayOrigin = new THREE.Vector3();
+      raycastingCamera.getWorldPosition(rayOrigin); // Get world position from the correct camera
+
+      rayPoints.push(rayOrigin.clone());
+      rayPoints.push(rayOrigin.clone().add(raycaster.ray.direction.clone().multiplyScalar(10)));
       rayDebugLine.geometry.setFromPoints(rayPoints);
       rayDebugLine.geometry.attributes.position.needsUpdate = true;
       rayDebugLine.visible = true;
-      setTimeout(() => { if (rayDebugLine) rayDebugLine.visible = false; }, 1000);
+      setTimeout(() => { if (rayDebugLine) rayDebugLine.visible = false; }, 1500); // Increased visibility time
     }
-    // --- END VISUALIZE THE RAY ---
 
     const intersects = raycaster.intersectObjects(allPlacedObjects, true);
     // console.log("Intersects:", intersects.length, intersects.map(i => i.object.name ? i.object.name : (i.object.parent ? i.object.parent.name : "Unknown"))); // DEBUG
@@ -379,11 +393,9 @@ function onTouchStart(event) {
           }
           pinchScaling = pinchRotating = threeFingerMoving = false; return;
       } else {
-          // console.log("Intersection found, but not with a tracked root object. Deselecting if any."); // DEBUG
           if (selectedForManipulationObject) deselectObject(selectedForManipulationObject);
       }
     } else {
-      // console.log("No intersection with placed objects. Deselecting if any."); // DEBUG
       if (selectedForManipulationObject) deselectObject(selectedForManipulationObject);
     }
   }
@@ -399,7 +411,7 @@ function onTouchStart(event) {
   }
 }
 
-function onTouchMove(event) {
+function onTouchMove(event) { /* ... (same as before, uses selectedForManipulationObject) ... */
   if (!selectedForManipulationObject && !moving && !pinchScaling && !threeFingerMoving) return;
 
   if (threeFingerMoving && event.touches.length === 3 && selectedForManipulationObject) {
@@ -432,7 +444,7 @@ function onTouchMove(event) {
   }
 }
 
-function onTouchEnd(event) {
+function onTouchEnd(event) { /* ... (same as before, uses selectedForManipulationObject and updates global currentScale) ... */
   if (threeFingerMoving && event.touches.length < 3) threeFingerMoving = false;
   if ((pinchScaling || pinchRotating) && event.touches.length < 2) {
     if (selectedForManipulationObject) {
@@ -446,5 +458,5 @@ function onTouchEnd(event) {
   }
 }
 
-function getPinchDistance(touches) { return Math.hypot(touches[0].pageX - touches[1].pageX, touches[0].pageY - touches[1].pageY); }
-function getPinchAngle(touches) { return Math.atan2(touches[0].pageY - touches[1].pageY, touches[0].pageX - touches[1].pageX); }
+function getPinchDistance(touches) { /* ... (same as before) ... */ return Math.hypot(touches[0].pageX - touches[1].pageX, touches[0].pageY - touches[1].pageY); }
+function getPinchAngle(touches) { /* ... (same as before) ... */ return Math.atan2(touches[0].pageY - touches[1].pageY, touches[0].pageX - touches[1].pageX); }
