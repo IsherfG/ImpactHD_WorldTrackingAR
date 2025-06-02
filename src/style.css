@@ -1,220 +1,263 @@
+/* Keep your existing :root, body, general typography if you like */
 :root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
-
-  color-scheme: light dark;
-
+  color-scheme: light dark; /* Respect user's light/dark mode preference */
+  color: #f0f0f0; /* Light text for dark background */
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-text-size-adjust: 100%;
-}
-
-a {
-  font-weight: 500;
-  color: #ffffff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #777777;
+  --ui-background: rgba(20, 20, 25, 0.85); /* Semi-transparent dark background for UI elements */
+  --accent-color: #007aff; /* A nice blue for accents/selection */
+  --danger-color: #ff3b30; /* Red for delete */
+  --success-color: #34c759; /* Green for place */
+  --button-padding: 10px 15px;
+  --border-radius: 8px;
 }
 
 body {
   margin: 0;
-  background-color: #242424;
+  background-color: #1c1c1e; /* Dark background for the page itself */
+  overscroll-behavior: none; /* Prevent pull-to-refresh in AR */
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
 }
 
-#overlay{
+#overlay {
+  position: fixed; /* Cover the whole screen */
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  width: 100%;
-  min-height: 80vh;
-  justify-content: center;
+  justify-content: space-between; /* Pushes top-bar up, bottom-controls down */
   align-items: center;
+  pointer-events: none; /* Allow taps to go through to canvas by default */
+  z-index: 10; /* Above canvas */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  box-sizing: border-box;
 }
 
-#instructions{
-  margin: auto;
-  flex-grow: 1;
-  display: none;
-  margin-top: 3rem;
+/* Allow pointer events on specific UI children */
+#overlay > * {
+  pointer-events: auto;
 }
 
+/* --- Tracking Prompt --- */
+#tracking-prompt {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: var(--ui-background);
+  padding: 20px;
+  border-radius: var(--border-radius);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+  text-align: center;
+}
+#tracking-prompt img {
+  width: 60px;
+  height: 60px;
+  /* You can add your animations back here if desired */
+}
+#tracking-prompt span {
+    font-size: 0.9rem;
+    color: #e0e0e0;
+}
+
+
+/* --- Top Bar --- */
+#top-bar {
+  width: calc(100% - 30px); /* Full width minus some padding */
+  margin: 15px;
+  margin-top: calc(15px + env(safe-area-inset-top)); /* Account for notch */
+  background-color: var(--ui-background);
+  padding: 10px 15px;
+  border-radius: var(--border-radius);
+  text-align: center;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+  display: none; /* Initially hidden */
+}
+#instruction-text {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #e0e0e0;
+}
+
+/* --- Bottom Controls --- */
+#bottom-controls {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+  padding-bottom: calc(20px + env(safe-area-inset-bottom)); /* Account for home bar */
+  box-sizing: border-box;
+  display: none; /* Initially hidden */
+}
+
+/* Object Selector (Horizontal Scroll) */
+#object-selector {
+  width: 100%;
+  display: flex;
+  overflow-x: auto;
+  padding: 10px 15px; /* Padding for scroll area */
+  gap: 10px;
+  box-sizing: border-box;
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+  scrollbar-width: none; /* Hide scrollbar on Firefox */
+}
+#object-selector::-webkit-scrollbar {
+  display: none; /* Hide scrollbar on Chrome/Safari */
+}
+
+.object-btn {
+  background-color: rgba(50, 50, 55, 0.9);
+  border: 2px solid transparent;
+  border-radius: var(--border-radius);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 80px; /* Ensure buttons have a decent tap area */
+  height: 90px;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s;
+  color: #f0f0f0;
+}
+.object-btn img {
+  width: 45px;
+  height: 45px;
+  object-fit: contain;
+  margin-bottom: 5px;
+}
+.object-btn span {
+  font-size: 0.7rem;
+  text-align: center;
+  white-space: nowrap; /* Prevent text wrapping if too long */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 70px;
+}
+.object-btn:hover {
+  background-color: rgba(70, 70, 75, 0.9);
+}
+.object-btn.selected {
+  border-color: var(--accent-color);
+  background-color: rgba(0, 122, 255, 0.3); /* Accent color with some transparency */
+}
+
+/* Action Buttons (Place, Delete) */
+#action-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  padding: 0 15px; /* Sideways padding for the container */
+}
+
+.action-btn {
+  border: none;
+  border-radius: 50px; /* Pill shape or circle */
+  padding: var(--button-padding);
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: white;
+  min-width: 120px; /* Give some width */
+  justify-content: center;
+}
+.action-btn:active {
+  transform: scale(0.95);
+}
+
+.action-btn i { /* Styles for Font Awesome icons */
+  font-size: 1.2em;
+}
+
+.place-btn {
+  background-color: var(--success-color);
+}
+.place-btn:hover {
+  background-color: #28a745; /* Darker green */
+}
+
+.delete-btn {
+  background-color: var(--danger-color);
+}
+.delete-btn:hover {
+  background-color: #dc3545; /* Darker red */
+}
+
+
+/* Fallback for non-AR mode if #app is used */
 #app {
   max-width: 1280px;
-  flex-grow: 1;
-  min-height: 80vh;
-  min-width: 320px;
-  padding: 2rem;
+  min-height: 100vh; /* Full height */
   display: flex;
   flex-direction: column;
   place-items: center;
   justify-content: center;
   margin: auto;
   text-align: center;
-  position:absolute;
-  top:0;
-  left:0;
-  right:0;
-  bottom:0;
-  z-index: 15;
-  
+  position: absolute; /* Should be relative if you want it in document flow */
+  top:0; left:0; right:0; bottom:0;
+  z-index: 15; /* Above overlay if not in AR, or adjust */
+  padding: 2rem;
+  box-sizing: border-box;
+  /* background-color: #242424; /* If #app is visible and needs a background */
 }
-
-@keyframes circle {
-  from { transform: translateX(-50%) rotate(0deg) translateX(50px) rotate(0deg); }
-  to   { transform: translateX(-50%) rotate(360deg) translateX(50px) rotate(-360deg); }
-}
-
-@keyframes elongate {
-  from { transform: translateX(100px); }
-  to   { transform: translateX(-100px); }
-}
-
-#tracking-prompt {
-  position: absolute;
-  left: 50%;
-  bottom: 175px;
-  animation: elongate 2s infinite ease-in-out alternate;
-  display: none;
-}
-
-
- #tracking-prompt > img {
-  animation: circle 4s linear infinite;
-}
-
-#qr-code{
-  border-radius: 0.5rem;
-  box-shadow: 0 0 0 0.3rem rgba(0, 0, 0, 0.1), 0 0.3rem 0.6rem rgba(0, 0, 0, 0.2);
-  margin-top: 2rem;
-}
-
 #ar-not-supported {
-  width:100%
-}
-
-#variant-logo {
-  border-radius: 0.3rem;
-}
-
-canvas {
-  position:absolute;
-  top:0;
-  left:0;
-  right:0;
-  bottom:0;
-  width:100%;
-  height:100%;
-  z-index: 1;
-}
-
-.xr-button-overlay{
-  z-index: 100 !important;
-}
-#button-container button img {
-  width: 80px; /* Reduced width for smaller screens */
-  height: auto; /* Maintain aspect ratio */
-}
-
-/* General button styling */
-#button-container {
-  position: absolute;
-  bottom: 150px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  gap: 10px;
-}
-
-/* Specific style for the "Place Object" button */
-#place-object-btn {
-  background-color: #04AA6D;
-  border-radius: 100%;
-  color: white;
+  background-color: var(--ui-background);
   padding: 20px;
-  text-align: center;
-  text-decoration: none;
-  display: inline-block;
-  font-size: 16px;
-  margin: 4px 2px;
-  position: absolute;
-  bottom: -100px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 60px;
-  height: 60px;
+  border-radius: var(--border-radius);
+  color: #f0f0f0;
 }
 
-#delete-object-btn {
-  background-color: #ff0000;
-  border-radius: 100%;
-  color: white;
-  padding: 20px;
-  text-align: center;
-  text-decoration: none;
-  display: inline-block;
-  font-size: 16px;
-  margin: 4px 2px;
-  position: absolute;
-  bottom: -100px;
-  left: 80%;
-  transform: translateX(0%);
-  width: 60px;
-  height: 60px;
-}
+/* Original #instructions can be removed or repurposed for the top-bar */
+#instructions { display: none; }
 
-#place-object-btn:hover {
-  background-color: #218838;
-}
 
-/* Responsive adjustments for smaller screens (phones) */
-@media (max-width: 768px) {
-  #button-container button img {
-    width: 60px; /* Smaller icon size for phones */
+/* Responsive adjustments */
+@media (max-width: 600px) {
+  .object-btn {
+    min-width: 70px;
+    height: 80px;
   }
-
-  #button-container {
-    bottom: 120px; /* Adjusted bottom position */
-    gap: 5px; /* Reduce spacing between buttons */
+  .object-btn img {
+    width: 35px;
+    height: 35px;
   }
-
-  #place-object-btn, #delete-object-btn {
-    padding: 15px;
-    font-size: 14px; /* Smaller font size */
-    width: 50px;
-    height: 50px; /* Smaller button size */
-    bottom: -80px; /* Adjusted bottom position */
+  .object-btn span {
+    font-size: 0.65rem;
   }
-
-  #delete-object-btn {
-    left: 70%; /* Adjusted positioning for smaller screens */
+  .action-btn {
+    padding: 8px 12px;
+    font-size: 0.9rem;
+    min-width: 100px;
   }
-}
-
-/* Extra adjustments for very small screens (e.g., narrow phones) */
-@media (max-width: 480px) {
-  #button-container {
-    bottom: 100px;
-    gap: 5px;
-  }
-
-  #place-object-btn, #delete-object-btn {
-    padding: 12px;
-    font-size: 12px;
-    width: 45px;
-    height: 45px;
-    bottom: -70px;
-  }
-
-  #delete-object-btn {
-    left: 65%;
+  #action-buttons {
+    gap: 15px;
   }
 }

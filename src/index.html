@@ -2,57 +2,77 @@
 <html lang="en">
   <head>
     <title>Variant Launch ThreeJS Example</title>
-
-    <!-- REPLACE WITH YOUR SDK KEY TAG FROM https://launchar.app -->
     <script src="https://launchar.app/sdk/v1?key=kn2ADuXkMYN2FdWXljqrYXQJiCoeYnBg&redirect=true"></script>
-    <!-- / REPLACE WITH YOUR SDK KEY TAG FROM https://launchar.app -->
-
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;600;700&display=swap"
       rel="stylesheet"
     />
+    <!-- Add Font Awesome for icons (optional, but good for UI buttons) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <meta charset="UTF-8" />
     <link rel="icon" href="/favicon.ico" />
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
+    <link rel="stylesheet" href="style.css"> <!-- Link to your CSS -->
   </head>
   <body>
     <div id="overlay">
-      <div id="tracking-prompt"><img src="hand.png" /></div>
-      <div id="instructions">AR SEESION</div>
-      <div id="button-container" style = "display : none;">
-        <button id="object1" data-ignore-tap="true">
-          <img src="Icon1.png" alt="Place Flower" />
-        </button>
-        <button id="object2" data-ignore-tap="true">
-          <img src="Icon2.png" alt="Place Flower" />
-        </button>
-        <button id="object3" data-ignore-tap="true">
-          <img src="Icon3.png" alt="Place Flower" />
-        </button>
-        <button id="object4" data-ignore-tap="true">
-          <img src="Icon4.png" alt="Place Flower" />
-        </button>
-        <button id="object5" data-ignore-tap="true">
-          <img src="Icon5.png" alt="Place Flower" />
-        </button>
-        <button id="place-object-btn"></button>
-        
-        <button id="delete-object-btn" style = "display : none;"></button>
+      <!-- Tracking Prompt (can stay as is or be integrated into top bar) -->
+      <div id="tracking-prompt" style="display: none;">
+        <img src="hand.png" alt="Scan Environment"/>
+        <span>Scan your environment</span>
       </div>
-    </div>
-    </div>
+
+      <!-- Top Information Bar -->
+      <div id="top-bar" style="display: none;">
+        <p id="instruction-text">AR Session Active</p>
+      </div>
+
+      <!-- Bottom Controls Area -->
+      <div id="bottom-controls" style="display: none;">
+        <div id="object-selector">
+          <!-- Object buttons will be dynamically added here or can be hardcoded -->
+          <button class="object-btn selected" id="object1-btn" data-object-id="obj1" data-ignore-tap="true">
+            <img src="Icon1.png" alt="Shelf 1" />
+            <span>Shelf A</span>
+          </button>
+          <button class="object-btn" id="object2-btn" data-object-id="obj2" data-ignore-tap="true">
+            <img src="Icon2.png" alt="Shelf 2" />
+            <span>Shelf B</span>
+          </button>
+          <button class="object-btn" id="object3-btn" data-object-id="obj3" data-ignore-tap="true">
+            <img src="Icon3.png" alt="Bag 1" />
+            <span>Bag Red</span>
+          </button>
+          <button class="object-btn" id="object4-btn" data-object-id="obj4" data-ignore-tap="true">
+            <img src="Icon4.png" alt="Bag 2" />
+            <span>Bag Blue</span>
+          </button>
+          <button class="object-btn" id="object5-btn" data-object-id="obj5" data-ignore-tap="true">
+            <img src="Icon5.png" alt="Bag 3" />
+            <span>Bag Green</span>
+          </button>
+        </div>
+
+        <div id="action-buttons">
+          <button id="place-object-btn" class="action-btn place-btn" data-ignore-tap="true">
+            <i class="fas fa-plus-circle"></i> <!-- Font Awesome icon example -->
+            <span>Place</span>
+          </button>
+          <button id="delete-object-btn" class="action-btn delete-btn" style="display: none;" data-ignore-tap="true">
+            <i class="fas fa-trash-alt"></i> <!-- Font Awesome icon example -->
+            <span>Delete</span>
+          </button>
+        </div>
+      </div>
+    </div> <!-- End #overlay -->
+
     <div id="app">
-
       <h2>商品配置</h2>
-      <div id="ar-not-supported">
-      </div>
+      <div id="ar-not-supported"></div>
     </div>
-
-    <!-- Add size control slider -->
- 
 
     <script type="module" src="/main.js"></script>
   </body>
