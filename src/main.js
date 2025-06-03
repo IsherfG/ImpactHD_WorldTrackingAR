@@ -174,7 +174,7 @@ function deselectObject(object) {
     }
 }
 
-
+//HELLO
 // --- Initialization ---
 function init() {
   onScreenLogElement = document.getElementById('on-screen-logger');
