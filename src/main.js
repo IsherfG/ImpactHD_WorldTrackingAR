@@ -27,7 +27,7 @@ let originalMaterials = new Map();
 
 const SELECTION_COLOR = 0xFFF176;
 const MOVE_SENSITIVITY = 0.002;
-const HDR_ENVIRONMENT_MAP_PATH = "hdr.hdr";
+const HDR_ENVIRONMENT_MAP_PATH = "hdr.hdr"; // Ensure this file exists in your public/root folder
 
 let initialPinchDistance = null,
   pinchScaling = false;
@@ -38,9 +38,6 @@ let moving = false,
 let threeFingerMoving = false,
   initialZPosition = null,
   initialThreeFingerY = null;
-
-// const raycaster = new THREE.Raycaster(); // Raycaster no longer needed for selection
-// const tapPosition = new THREE.Vector2(); // Tap position no longer needed for selection
 
 let selectedObject = "obj1"; // For the object palette
 
@@ -143,7 +140,7 @@ function highlightSelectedObject(object) {
       const highlightMaterial = new THREE.MeshStandardMaterial({
         color: SELECTION_COLOR,
         emissive: SELECTION_COLOR,
-        emissiveIntensity: 0.1,
+        emissiveIntensity: 0.1, 
         map: originalChildMaterial?.map || null,
       });
       child.material = highlightMaterial;
@@ -176,7 +173,6 @@ function deselectObject(objectToDeselect) {
   selectedForManipulationObject = null;
   if (deleteObjectBtn) deleteObjectBtn.style.display = "none";
   currentSelectedIndex = -1;
-  // updateCycleButtonVisibility(); // Called by functions that change allPlacedObjects or selection
 }
 
 // --- Initialization ---
@@ -200,9 +196,19 @@ function init() {
   directionalLight.castShadow = true;
   directionalLight.shadow.mapSize.width = 1024;
   directionalLight.shadow.mapSize.height = 1024;
-  // ... (shadow camera setup)
+
+  directionalLight.shadow.camera.near = 0.1;
+  directionalLight.shadow.camera.far = 20; 
+  directionalLight.shadow.camera.left = -5; 
+  directionalLight.shadow.camera.right = 5; 
+  directionalLight.shadow.camera.top = 5;   
+  directionalLight.shadow.camera.bottom = -5;
+
   directionalLight.shadow.bias = -0.001;
   scene.add(directionalLight);
+
+  // const shadowCamHelper = new THREE.CameraHelper(directionalLight.shadow.camera); // For debugging
+  // scene.add(shadowCamHelper);
 
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(window.devicePixelRatio);
@@ -216,7 +222,7 @@ function init() {
   container.appendChild(renderer.domElement);
   renderer.xr.addEventListener("sessionstart", sessionStart);
 
-  new RGBELoader().setPath("").load(
+  new RGBELoader().setPath("").load( // Make sure HDR_ENVIRONMENT_MAP_PATH points to your actual .hdr file
     HDR_ENVIRONMENT_MAP_PATH,
     (texture) => {
       texture.mapping = THREE.EquirectangularReflectionMapping;
@@ -234,7 +240,6 @@ function init() {
   });
   document.body.appendChild(arButton);
 
-  // Get UI elements
   placeObjectBtn = document.getElementById("place-object-btn");
   deleteObjectBtn = document.getElementById("delete-object-btn");
   prevObjectBtn = document.getElementById("prev-object-btn");
@@ -278,9 +283,9 @@ function init() {
         if (newIndexToSelect >= allPlacedObjects.length) {
           newIndexToSelect = allPlacedObjects.length - 1;
         }
-        if (newIndexToSelect < 0) newIndexToSelect = 0;
+        if (newIndexToSelect < 0 && allPlacedObjects.length > 0) newIndexToSelect = 0; 
 
-        if (allPlacedObjects[newIndexToSelect]) {
+        if (allPlacedObjects.length > 0 && allPlacedObjects[newIndexToSelect]) { 
           selectObject(allPlacedObjects[newIndexToSelect]);
         }
       }
@@ -291,7 +296,7 @@ function init() {
   prevObjectBtn.addEventListener("click", () => {
     if (allPlacedObjects.length === 0) return;
     if (currentSelectedIndex === -1 && allPlacedObjects.length > 0) {
-      currentSelectedIndex = allPlacedObjects.length - 1; // Select last
+      currentSelectedIndex = allPlacedObjects.length - 1; 
     } else {
       currentSelectedIndex--;
       if (currentSelectedIndex < 0) {
@@ -304,7 +309,7 @@ function init() {
   nextObjectBtn.addEventListener("click", () => {
     if (allPlacedObjects.length === 0) return;
     if (currentSelectedIndex === -1 && allPlacedObjects.length > 0) {
-      currentSelectedIndex = 0; // Select first
+      currentSelectedIndex = 0;
     } else {
       currentSelectedIndex++;
       if (currentSelectedIndex >= allPlacedObjects.length) {
@@ -359,99 +364,11 @@ function init() {
     });
   }
 
-  gltfLoader.load(
-    "Shelf.glb",
-    (g) => {
-      object1 = g.scene;
-      if (object1) object1.name = "Shelf_GLTF_Root";
-    },
-    undefined,
-    loadErrCb("Shelf.glb")
-  );
-  textureLoader.load(
-    "Shelf.png",
-    (t) => {
-      t.flipY = false;
-      t.encoding = THREE.sRGBEncoding;
-      gltfLoader.load(
-        "Shelf2.glb",
-        (g) => {
-          object2 = g.scene;
-          if (object2) {
-            object2.name = "Shelf2_GLTF_Root";
-            applyTex(object2, t);
-          }
-        },
-        undefined,
-        loadErrCb("Shelf2.glb")
-      );
-    },
-    undefined,
-    loadErrCb("Shelf.png")
-  );
-  textureLoader.load(
-    "Map1.png",
-    (t) => {
-      t.flipY = false;
-      t.encoding = THREE.sRGBEncoding;
-      gltfLoader.load(
-        "Bag1.glb",
-        (g) => {
-          object3 = g.scene;
-          if (object3) {
-            object3.name = "Bag1_GLTF_Root";
-            applyTex(object3, t);
-          }
-        },
-        undefined,
-        loadErrCb("Bag1.glb")
-      );
-    },
-    undefined,
-    loadErrCb("Map1.png")
-  );
-  textureLoader.load(
-    "Map2.jpg",
-    (t) => {
-      t.flipY = false;
-      t.encoding = THREE.sRGBEncoding;
-      gltfLoader.load(
-        "Bag2.glb",
-        (g) => {
-          object4 = g.scene;
-          if (object4) {
-            object4.name = "Bag2_GLTF_Root";
-            applyTex(object4, t);
-          }
-        },
-        undefined,
-        loadErrCb("Bag2.glb")
-      );
-    },
-    undefined,
-    loadErrCb("Map2.jpg")
-  );
-  textureLoader.load(
-    "Map3.png",
-    (t) => {
-      t.flipY = false;
-      t.encoding = THREE.sRGBEncoding;
-      gltfLoader.load(
-        "Bag3.glb",
-        (g) => {
-          object5 = g.scene;
-          if (object5) {
-            object5.name = "Bag3_GLTF_Root";
-            applyTex(object5, t);
-          }
-        },
-        undefined,
-        loadErrCb("Bag3.glb")
-      );
-    },
-    undefined,
-    loadErrCb("Map3.png")
-  );
+  gltfLoader.load( "Shelf.glb", (g) => { object1 = g.scene; if (object1) object1.name = "Shelf_GLTF_Root"; }, undefined, loadErrCb("Shelf.glb"));
+  textureLoader.load( "Shelf.png", (t) => { t.flipY = false; t.encoding = THREE.sRGBEncoding; gltfLoader.load( "Shelf2.glb", (g) => { object2 = g.scene; if (object2) { object2.name = "Shelf2_GLTF_Root"; applyTex(object2, t);}}, undefined, loadErrCb("Shelf2.glb"));}, undefined, loadErrCb("Shelf.png"));
+  textureLoader.load( "Map1.png", (t) => { t.flipY = false; t.encoding = THREE.sRGBEncoding; gltfLoader.load( "Bag1.glb", (g) => { object3 = g.scene; if (object3) { object3.name = "Bag1_GLTF_Root"; applyTex(object3, t);}}, undefined, loadErrCb("Bag1.glb"));}, undefined, loadErrCb("Map1.png"));
+  textureLoader.load( "Map2.jpg", (t) => { t.flipY = false; t.encoding = THREE.sRGBEncoding; gltfLoader.load( "Bag2.glb", (g) => { object4 = g.scene; if (object4) { object4.name = "Bag2_GLTF_Root"; applyTex(object4, t);}}, undefined, loadErrCb("Bag2.glb"));}, undefined, loadErrCb("Map2.jpg"));
+  textureLoader.load( "Map3.png", (t) => { t.flipY = false; t.encoding = THREE.sRGBEncoding; gltfLoader.load( "Bag3.glb", (g) => { object5 = g.scene; if (object5) { object5.name = "Bag3_GLTF_Root"; applyTex(object5, t);}}, undefined, loadErrCb("Bag3.glb"));}, undefined, loadErrCb("Map3.png"));
 
   window.addEventListener("resize", onWindowResize);
   window.addEventListener("touchstart", onTouchStart, { passive: false });
@@ -470,10 +387,10 @@ function onSelect() {
 
     if (modelToClone) {
       const mesh = modelToClone.clone();
-      mesh.name =
-        (modelToClone.name || "ClonedObject") + "_instance_" + Date.now();
+      mesh.name = (modelToClone.name || "ClonedObject") + "_instance_" + Date.now();
+      
       mesh.castShadow = true;
-      mesh.receiveShadow = true;
+      mesh.receiveShadow = true; 
       mesh.traverse((child) => {
         if (child.isMesh) {
           child.castShadow = true;
@@ -496,8 +413,7 @@ function onSelect() {
       lastPlacedObject = mesh;
       allPlacedObjects.push(mesh);
 
-      selectObject(mesh); // Select the newly placed object
-      // updateCycleButtonVisibility(); // selectObject calls this
+      selectObject(mesh);
 
       const targetScaleVal = mesh.scale.x;
       mesh.scale.setScalar(targetScaleVal * 0.1);
@@ -610,14 +526,11 @@ function onTouchStart(event) {
     return;
   }
 
-  // If no object is selected, touch interactions on the scene (other than UI) do nothing.
   if (!selectedForManipulationObject) {
     moving = pinchScaling = pinchRotating = threeFingerMoving = false;
     return;
   }
 
-  // At this point, an object IS selected, and the touch is NOT on a UI element.
-  // Handle gestures for the selectedForManipulationObject
   if (event.touches.length === 1) {
     moving = true;
     initialTouchPosition = new THREE.Vector2(
