@@ -22,8 +22,6 @@
   --danger-color-hover: #E0241A;
   --success-color: #34c759; /* iOS-like green for positive actions */
   --success-color-hover: #28a745;
-  --neutral-color: #55555c; /* Neutral color for cycle buttons */
-  --neutral-color-hover: #66666e;
   
   --button-padding: 10px 15px;
   --border-radius: 12px; /* Softer, more modern border radius */
@@ -179,16 +177,13 @@ canvas {
   box-shadow: 0 0 10px var(--accent-color-transparent); /* Glow effect */
 }
 
-/* Action Buttons Container (Place, Delete, Prev, Next) */
+/* Action Buttons Container (Place, Delete) */
 #action-buttons {
   display: flex;
   justify-content: center;
-  gap: 10px; /* Space between action buttons */
+  gap: 20px; /* Space between Place and Delete buttons */
   padding: 0 15px; /* Side padding for the container */
   margin-top: 5px; /* Small space above action buttons */
-  flex-wrap: wrap; /* Allow buttons to wrap if not enough horizontal space */
-  width: 100%;
-  box-sizing: border-box;
 }
 
 /* General Action Button Styling */
@@ -207,15 +202,7 @@ canvas {
   color: white; /* Text color */
   min-width: 130px; /* Minimum width */
   box-shadow: var(--ui-shadow);
-  flex-grow: 1; /* Allow buttons to grow a bit if space, but also wrap */
-  flex-basis: 130px; /* Base width before growing/shrinking */
 }
-@media (min-width: 600px) { /* On larger screens, don't let them grow too much */
-    .action-btn {
-        flex-grow: 0;
-    }
-}
-
 
 .action-btn:active {
   transform: scale(0.96); /* Slightly more noticeable press effect */
@@ -240,15 +227,6 @@ canvas {
 .delete-btn:hover {
   background-color: var(--danger-color-hover); /* Darker red on hover */
 }
-
-/* Specific styling for Cycle buttons */
-.cycle-btn {
-  background-color: var(--neutral-color);
-}
-.cycle-btn:hover {
-  background-color: var(--neutral-color-hover);
-}
-
 
 /* Fallback content styling (e.g., if AR is not supported) */
 #app {
@@ -293,11 +271,10 @@ canvas {
   .action-btn {
     padding: 10px 20px; /* Adjust padding */
     font-size: 0.9rem;
-    min-width: 110px; /* Adjust min-width for smaller screens */
-    flex-basis: 110px; /* Adjust flex-basis */
+    min-width: 110px;
   }
   #action-buttons {
-    gap: 8px; /* Reduce gap between action buttons on small screens */
+    gap: 15px; /* Reduce gap between action buttons */
   }
 
   #tracking-prompt {
