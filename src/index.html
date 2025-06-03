@@ -2,9 +2,7 @@
 <html lang="en">
   <head>
     <title>Variant Launch ThreeJS Example</title>
-    <!-- Variant Launch SDK -->
     <script src="https://launchar.app/sdk/v1?key=kn2ADuXkMYN2FdWXljqrYXQJiCoeYnBg&redirect=true"></script>
-    
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;600;700&display=swap"
       rel="stylesheet"
@@ -16,36 +14,33 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
-    <link rel="stylesheet" href="style.css"> <!-- Your existing stylesheet -->
-
-    <!-- Style for the on-screen logger -->
+    <link rel="stylesheet" href="style.css">
+    <!-- Add style for the on-screen logger -->
     <style>
       #on-screen-logger {
         position: fixed;
-        top: calc(10px + env(safe-area-inset-top));
+        top: calc(10px + env(safe-area-inset-top)); /* Respect safe area */
         left: 10px;
         right: 10px;
-        max-height: 25vh; /* Adjusted max-height */
-        overflow-y: auto;
-        background-color: rgba(0, 0, 0, 0.75);
-        color: #0f0;
+        max-height: 30vh; /* Limit height */
+        overflow-y: auto; /* Scroll if content overflows */
+        background-color: rgba(0, 0, 0, 0.7);
+        color: #0f0; /* Green text for logs */
         font-family: monospace;
-        font-size: 10px; /* Slightly smaller for more lines */
-        padding: 8px; /* Increased padding */
-        border: 1px solid #444;
-        border-radius: 6px;
-        z-index: 1000; /* Ensure it's on top */
-        pointer-events: none;
-        white-space: pre-wrap;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        font-size: 10px;
+        padding: 5px;
+        border: 1px solid #333;
+        border-radius: 5px;
+        z-index: 100; /* Above everything else */
+        pointer-events: none; /* So it doesn't interfere with touches */
+        white-space: pre-wrap; /* Preserve line breaks and spaces */
       }
-      #on-screen-logger div {
-        border-bottom: 1px dotted #555;
-        padding-bottom: 3px;
-        margin-bottom: 3px;
-        word-break: break-all; /* Help with long log lines */
+      #on-screen-logger div { /* Individual log entry styling */
+        border-bottom: 1px dotted #444;
+        padding-bottom: 2px;
+        margin-bottom: 2px;
       }
-      #on-screen-logger div:last-child {
+      #on-screen-logger div:last-child { /* No border for the last entry */
         border-bottom: none;
       }
     </style>
@@ -54,13 +49,14 @@
     <div id="overlay">
       <!-- ON-SCREEN LOGGER ELEMENT -->
       <div id="on-screen-logger"></div>
+      <!-- END ON-SCREEN LOGGER ELEMENT -->
 
-      <div id="tracking-prompt" style="display: none;"> <!-- Initially hidden, shown by JS -->
+      <div id="tracking-prompt" style="display: none;">
         <img src="hand.png" alt="Scan Environment"/>
         <span>Scan your environment</span>
       </div>
 
-      <div id="bottom-controls" style="display: none;"> <!-- Initially hidden, shown by JS -->
+      <div id="bottom-controls" style="display: none;">
         <div id="object-selector">
           <button class="object-btn selected" id="object1-btn" data-object-id="obj1" data-ignore-tap="true">
             <img src="Icon1.png" alt="Shelf 1" />
@@ -85,38 +81,21 @@
         </div>
 
         <div id="action-buttons">
-          <button id="prev-object-btn" class="action-btn cycle-btn" data-ignore-tap="true" style="display: none;">
-            <i class="fas fa-chevron-left"></i>
-            <!-- <span>Prev</span> Optional text -->
-          </button>
           <button id="place-object-btn" class="action-btn place-btn" data-ignore-tap="true">
             <i class="fas fa-plus-circle"></i>
             <span>Place</span>
-          </button>
-          <button id="next-object-btn" class="action-btn cycle-btn" data-ignore-tap="true" style="display: none;">
-            <i class="fas fa-chevron-right"></i>
-            <!-- <span>Next</span> Optional text -->
           </button>
           <button id="delete-object-btn" class="action-btn delete-btn" style="display: none;" data-ignore-tap="true">
             <i class="fas fa-trash-alt"></i>
             <span>Delete</span>
           </button>
-          <!-- Example additional manipulation buttons (uncomment and style if needed) -->
-          <!-- 
-          <button id="scale-up-btn" class="action-btn manip-btn" data-ignore-tap="true" style="display: none;"><i class="fas fa-search-plus"></i></button>
-          <button id="scale-down-btn" class="action-btn manip-btn" data-ignore-tap="true" style="display: none;"><i class="fas fa-search-minus"></i></button>
-          <button id="rotate-y-left-btn" class="action-btn manip-btn" data-ignore-tap="true" style="display: none;"><i class="fas fa-undo"></i></button>
-          <button id="rotate-y-right-btn" class="action-btn manip-btn" data-ignore-tap="true" style="display: none;"><i class="fas fa-redo"></i></button>
-          <button id="move-up-btn" class="action-btn manip-btn" data-ignore-tap="true" style="display: none;"><i class="fas fa-arrow-up"></i></button>
-          <button id="move-down-btn" class="action-btn manip-btn" data-ignore-tap="true" style="display: none;"><i class="fas fa-arrow-down"></i></button>
-           -->
         </div>
       </div>
     </div>
 
-    <div id="app"> <!-- Fallback content area -->
+    <div id="app">
       <h2>商品配置</h2>
-      <div id="ar-not-supported">Loading AR capabilities...</div>
+      <div id="ar-not-supported"></div>
     </div>
 
     <script type="module" src="/main.js"></script>
