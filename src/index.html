@@ -15,18 +15,46 @@
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
     <link rel="stylesheet" href="style.css">
+    <!-- Add style for the on-screen logger -->
+    <style>
+      #on-screen-logger {
+        position: fixed;
+        top: calc(10px + env(safe-area-inset-top)); /* Respect safe area */
+        left: 10px;
+        right: 10px;
+        max-height: 30vh; /* Limit height */
+        overflow-y: auto; /* Scroll if content overflows */
+        background-color: rgba(0, 0, 0, 0.7);
+        color: #0f0; /* Green text for logs */
+        font-family: monospace;
+        font-size: 10px;
+        padding: 5px;
+        border: 1px solid #333;
+        border-radius: 5px;
+        z-index: 100; /* Above everything else */
+        pointer-events: none; /* So it doesn't interfere with touches */
+        white-space: pre-wrap; /* Preserve line breaks and spaces */
+      }
+      #on-screen-logger div { /* Individual log entry styling */
+        border-bottom: 1px dotted #444;
+        padding-bottom: 2px;
+        margin-bottom: 2px;
+      }
+      #on-screen-logger div:last-child { /* No border for the last entry */
+        border-bottom: none;
+      }
+    </style>
   </head>
   <body>
     <div id="overlay">
+      <!-- ON-SCREEN LOGGER ELEMENT -->
+      <div id="on-screen-logger"></div>
+      <!-- END ON-SCREEN LOGGER ELEMENT -->
+
       <div id="tracking-prompt" style="display: none;">
         <img src="hand.png" alt="Scan Environment"/>
         <span>Scan your environment</span>
       </div>
-
-      <!-- TOP BAR REMOVED -->
-      <!-- <div id="top-bar" style="display: none;">
-        <p id="instruction-text">AR Session Active</p>
-      </div> -->
 
       <div id="bottom-controls" style="display: none;">
         <div id="object-selector">
