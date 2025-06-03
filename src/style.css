@@ -92,7 +92,6 @@ canvas {
 #tracking-prompt img {
   width: 60px; /* Adjust size as needed */
   height: 60px;
-  /* Consider adding your animations back if desired (keyframes circle, elongate) */
 }
 
 #tracking-prompt span {
@@ -177,21 +176,22 @@ canvas {
   box-shadow: 0 0 10px var(--accent-color-transparent); /* Glow effect */
 }
 
-/* Action Buttons Container (Place, Delete) */
+/* Action Buttons Container (Place, Delete, Cycle) */
 #action-buttons {
   display: flex;
   justify-content: center;
-  gap: 20px; /* Space between Place and Delete buttons */
-  padding: 0 15px; /* Side padding for the container */
-  margin-top: 5px; /* Small space above action buttons */
+  align-items: center; /* Align items vertically */
+  gap: 10px; /* Reduced gap for more buttons */
+  padding: 0 15px;
+  margin-top: 5px;
 }
 
 /* General Action Button Styling */
 .action-btn {
   border: none;
   border-radius: 50px; /* Pill shape for a modern look */
-  padding: 12px 25px; /* Generous padding for easy tapping */
-  font-size: 1rem;
+  padding: 10px 20px; /* Slightly reduced padding */
+  font-size: 0.9rem; /* Slightly reduced font size */
   font-weight: 500; /* Medium weight for button text */
   cursor: pointer;
   transition: background-color 0.2s ease-out, transform 0.1s ease-out;
@@ -200,7 +200,7 @@ canvas {
   justify-content: center;
   gap: 8px; /* Space between icon and text within the button */
   color: white; /* Text color */
-  min-width: 130px; /* Minimum width */
+  min-width: 100px; /* Adjusted min-width */
   box-shadow: var(--ui-shadow);
 }
 
@@ -228,6 +228,17 @@ canvas {
   background-color: var(--danger-color-hover); /* Darker red on hover */
 }
 
+/* Specific styling for Cycle buttons */
+.cycle-btn {
+  background-color: var(--ui-button-background); /* Neutral color */
+  min-width: 90px; /* Smaller min-width for prev/next */
+  padding: 10px 15px;
+}
+.cycle-btn:hover {
+  background-color: var(--ui-button-hover-background);
+}
+
+
 /* Fallback content styling (e.g., if AR is not supported) */
 #app {
   max-width: 1280px;
@@ -243,7 +254,6 @@ canvas {
   z-index: 15; /* Should be above overlay if used as a primary non-AR screen */
   padding: 2rem;
   box-sizing: border-box;
-  /* background-color: #1c1c1e; /* Background if #app is the main view */
 }
 
 #ar-not-supported {
@@ -269,12 +279,16 @@ canvas {
   }
 
   .action-btn {
-    padding: 10px 20px; /* Adjust padding */
-    font-size: 0.9rem;
-    min-width: 110px;
+    padding: 10px 15px; /* Adjust padding */
+    font-size: 0.85rem;
+    min-width: 90px;
+  }
+  .cycle-btn {
+    min-width: 75px;
+    padding: 10px 12px;
   }
   #action-buttons {
-    gap: 15px; /* Reduce gap between action buttons */
+    gap: 8px; /* Reduce gap between action buttons */
   }
 
   #tracking-prompt {
@@ -287,11 +301,11 @@ canvas {
 
 /* Keyframes for animations (if you re-add them to #tracking-prompt img or elsewhere) */
 @keyframes circle {
-  from { transform: translateX(-50%) rotate(0deg) translateX(30px) rotate(0deg); } /* Smaller animation radius */
+  from { transform: translateX(-50%) rotate(0deg) translateX(30px) rotate(0deg); }
   to   { transform: translateX(-50%) rotate(360deg) translateX(30px) rotate(-360deg); }
 }
 
 @keyframes elongate {
-  from { transform: translateX(60px); } /* Smaller animation distance */
+  from { transform: translateX(60px); }
   to   { transform: translateX(-60px); }
 }

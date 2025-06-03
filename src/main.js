@@ -22,11 +22,12 @@ let currentScale = DEFAULT_OBJECT_SCALE;
 let lastPlacedObject = null;
 let allPlacedObjects = [];
 let selectedForManipulationObject = null;
+let currentSelectedIndex = -1; // Index of the selected object in allPlacedObjects
 let originalMaterials = new Map();
 
 const SELECTION_COLOR = 0xffaa00;
 const MOVE_SENSITIVITY = 0.002;
-const HDR_ENVIRONMENT_MAP_PATH = "hdr.hdr"; // !!! REPLACE WITH YOUR HDR PATH !!!
+const HDR_ENVIRONMENT_MAP_PATH = "hdr.hdr";
 
 let initialPinchDistance = null,
   pinchScaling = false;
@@ -38,11 +39,13 @@ let threeFingerMoving = false,
   initialZPosition = null,
   initialThreeFingerY = null;
 
-const raycaster = new THREE.Raycaster();
-const tapPosition = new THREE.Vector2();
-let rayDebugLine = null;
+// const raycaster = new THREE.Raycaster(); // Raycaster no longer needed for selection
+// const tapPosition = new THREE.Vector2(); // Tap position no longer needed for selection
 
-let selectedObject = "obj1";
+let selectedObject = "obj1"; // For the object palette
+
+// UI Elements
+let placeObjectBtn, deleteObjectBtn, prevObjectBtn, nextObjectBtn;
 
 // --- UI Helper ---
 function updateSelectedObjectButton(selectedId) {
@@ -52,6 +55,12 @@ function updateSelectedObjectButton(selectedId) {
       btn.classList.add("selected");
     }
   });
+}
+
+function updateCycleButtonVisibility() {
+  const show = allPlacedObjects.length > 1;
+  if (prevObjectBtn) prevObjectBtn.style.display = show ? "flex" : "none";
+  if (nextObjectBtn) nextObjectBtn.style.display = show ? "flex" : "none";
 }
 
 // --- WebXR Support & Session ---
@@ -84,8 +93,9 @@ function sessionStart() {
   document.getElementById("bottom-controls").style.display = "none";
   if (selectedForManipulationObject)
     deselectObject(selectedForManipulationObject);
-  document.getElementById("delete-object-btn").style.display = "none";
-  if (rayDebugLine) rayDebugLine.visible = false;
+  if (deleteObjectBtn) deleteObjectBtn.style.display = "none";
+  currentSelectedIndex = -1;
+  updateCycleButtonVisibility();
 }
 
 // --- Material Management for Selection ---
@@ -95,7 +105,7 @@ function storeOriginalMaterials(object) {
   object.traverse((child) => {
     if (child.isMesh && child.material) {
       const matClone = child.material.clone();
-      matClone.userData = { isOriginal: true }; // Mark as original
+      matClone.userData = { isOriginal: true };
       materialsToStore.push({ mesh: child, material: matClone });
     }
   });
@@ -106,7 +116,6 @@ function restoreOriginalMaterials(object) {
   if (originalMaterials.has(object)) {
     const materialsInfo = originalMaterials.get(object);
     materialsInfo.forEach((info) => {
-      // Dispose non-original material before replacing
       if (
         info.mesh.material !== info.material &&
         !info.mesh.material.userData?.isOriginal
@@ -119,27 +128,23 @@ function restoreOriginalMaterials(object) {
 }
 
 function highlightSelectedObject(object) {
-  storeOriginalMaterials(object); // Ensure original materials are stored
+  storeOriginalMaterials(object);
   object.traverse((child) => {
     if (child.isMesh && child.material) {
-      // Find the corresponding original material to get its map
       const originalChildMaterial = originalMaterials
         .get(object)
         ?.find((m) => m.mesh === child)?.material;
-
-      // Dispose previous highlight material if it's not the original
       if (
         child.material !== originalChildMaterial &&
         !child.material.userData?.isOriginal
       ) {
         child.material.dispose();
       }
-
       const highlightMaterial = new THREE.MeshStandardMaterial({
         color: SELECTION_COLOR,
         emissive: SELECTION_COLOR,
         emissiveIntensity: 0.4,
-        map: originalChildMaterial?.map || null, // Use original map if available
+        map: originalChildMaterial?.map || null,
       });
       child.material = highlightMaterial;
     }
@@ -147,22 +152,31 @@ function highlightSelectedObject(object) {
 }
 
 function selectObject(object) {
+  if (!object) return;
   if (selectedForManipulationObject === object) return;
-  if (selectedForManipulationObject)
-    deselectObject(selectedForManipulationObject);
+
+  if (selectedForManipulationObject) {
+    restoreOriginalMaterials(selectedForManipulationObject);
+  }
+
   selectedForManipulationObject = object;
   highlightSelectedObject(object);
-  document.getElementById("delete-object-btn").style.display = "flex";
-  currentScale = selectedForManipulationObject.scale.x; // Update currentScale from selected object
+  if (deleteObjectBtn) deleteObjectBtn.style.display = "flex";
+  currentScale = selectedForManipulationObject.scale.x;
+
+  currentSelectedIndex = allPlacedObjects.indexOf(object);
+  updateCycleButtonVisibility();
 }
 
-function deselectObject(object) {
-  if (!object) return;
-  restoreOriginalMaterials(object);
-  if (selectedForManipulationObject === object) {
-    selectedForManipulationObject = null;
-    document.getElementById("delete-object-btn").style.display = "none";
-  }
+function deselectObject(objectToDeselect) {
+  if (!objectToDeselect || selectedForManipulationObject !== objectToDeselect)
+    return;
+
+  restoreOriginalMaterials(objectToDeselect);
+  selectedForManipulationObject = null;
+  if (deleteObjectBtn) deleteObjectBtn.style.display = "none";
+  currentSelectedIndex = -1;
+  // updateCycleButtonVisibility(); // Called by functions that change allPlacedObjects or selection
 }
 
 // --- Initialization ---
@@ -186,12 +200,7 @@ function init() {
   directionalLight.castShadow = true;
   directionalLight.shadow.mapSize.width = 1024;
   directionalLight.shadow.mapSize.height = 1024;
-  directionalLight.shadow.camera.near = 0.1;
-  directionalLight.shadow.camera.far = 10;
-  directionalLight.shadow.camera.left = -2;
-  directionalLight.shadow.camera.right = 2;
-  directionalLight.shadow.camera.top = 2;
-  directionalLight.shadow.camera.bottom = -2;
+  // ... (shadow camera setup)
   directionalLight.shadow.bias = -0.001;
   scene.add(directionalLight);
 
@@ -206,18 +215,6 @@ function init() {
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   container.appendChild(renderer.domElement);
   renderer.xr.addEventListener("sessionstart", sessionStart);
-
-  // MODIFICATION: Make rayDebugLine thicker - Note: linewidth has limited support. For truly thicker lines, use Line2.
-  const lineMaterial = new THREE.LineBasicMaterial({
-    color: 0xff00ff,
-    linewidth: 5,
-  }); // linewidth might not work on all platforms
-  const points = [new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -1)];
-  const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
-  rayDebugLine = new THREE.Line(lineGeometry, lineMaterial);
-  rayDebugLine.frustumCulled = false;
-  rayDebugLine.visible = false; // Initially not visible
-  scene.add(rayDebugLine);
 
   new RGBELoader().setPath("").load(
     HDR_ENVIRONMENT_MAP_PATH,
@@ -237,18 +234,25 @@ function init() {
   });
   document.body.appendChild(arButton);
 
-  document
-    .getElementById("place-object-btn")
-    .addEventListener("click", onSelect);
-  document.getElementById("delete-object-btn").addEventListener("click", () => {
+  // Get UI elements
+  placeObjectBtn = document.getElementById("place-object-btn");
+  deleteObjectBtn = document.getElementById("delete-object-btn");
+  prevObjectBtn = document.getElementById("prev-object-btn");
+  nextObjectBtn = document.getElementById("next-object-btn");
+
+  placeObjectBtn.addEventListener("click", onSelect);
+
+  deleteObjectBtn.addEventListener("click", () => {
     if (selectedForManipulationObject) {
-      scene.remove(selectedForManipulationObject);
+      const deletedObject = selectedForManipulationObject;
+      const deletedObjectIndex = allPlacedObjects.indexOf(deletedObject);
+
+      scene.remove(deletedObject);
       allPlacedObjects = allPlacedObjects.filter(
-        (obj) => obj !== selectedForManipulationObject
+        (obj) => obj !== deletedObject
       );
-      originalMaterials.delete(selectedForManipulationObject); // Clean up stored materials
-      selectedForManipulationObject.traverse((child) => {
-        // Full disposal of object resources
+      originalMaterials.delete(deletedObject);
+      deletedObject.traverse((child) => {
         if (child.isMesh) {
           if (child.geometry) child.geometry.dispose();
           if (child.material) {
@@ -264,9 +268,50 @@ function init() {
           }
         }
       });
+
       selectedForManipulationObject = null;
-      document.getElementById("delete-object-btn").style.display = "none";
+      currentSelectedIndex = -1;
+      deleteObjectBtn.style.display = "none";
+
+      if (allPlacedObjects.length > 0) {
+        let newIndexToSelect = deletedObjectIndex;
+        if (newIndexToSelect >= allPlacedObjects.length) {
+          newIndexToSelect = allPlacedObjects.length - 1;
+        }
+        if (newIndexToSelect < 0) newIndexToSelect = 0;
+
+        if (allPlacedObjects[newIndexToSelect]) {
+          selectObject(allPlacedObjects[newIndexToSelect]);
+        }
+      }
+      updateCycleButtonVisibility();
     }
+  });
+
+  prevObjectBtn.addEventListener("click", () => {
+    if (allPlacedObjects.length === 0) return;
+    if (currentSelectedIndex === -1 && allPlacedObjects.length > 0) {
+      currentSelectedIndex = allPlacedObjects.length - 1; // Select last
+    } else {
+      currentSelectedIndex--;
+      if (currentSelectedIndex < 0) {
+        currentSelectedIndex = allPlacedObjects.length - 1;
+      }
+    }
+    selectObject(allPlacedObjects[currentSelectedIndex]);
+  });
+
+  nextObjectBtn.addEventListener("click", () => {
+    if (allPlacedObjects.length === 0) return;
+    if (currentSelectedIndex === -1 && allPlacedObjects.length > 0) {
+      currentSelectedIndex = 0; // Select first
+    } else {
+      currentSelectedIndex++;
+      if (currentSelectedIndex >= allPlacedObjects.length) {
+        currentSelectedIndex = 0;
+      }
+    }
+    selectObject(allPlacedObjects[currentSelectedIndex]);
   });
 
   document.querySelectorAll(".object-btn").forEach((button) => {
@@ -441,7 +486,7 @@ function onSelect() {
       reticle.matrix.decompose(newPosition, newQuaternion, new THREE.Vector3());
       mesh.position.copy(newPosition);
       mesh.quaternion.copy(newQuaternion);
-      mesh.scale.set(currentScale, currentScale, currentScale); // Use currentScale for initial placement
+      mesh.scale.set(currentScale, currentScale, currentScale);
 
       const camLookAt = new THREE.Vector3();
       camera.getWorldPosition(camLookAt);
@@ -451,26 +496,20 @@ function onSelect() {
       lastPlacedObject = mesh;
       allPlacedObjects.push(mesh);
 
-      if (
-        selectedForManipulationObject &&
-        selectedForManipulationObject !== mesh
-      ) {
-        deselectObject(selectedForManipulationObject);
-      }
       selectObject(mesh); // Select the newly placed object
+      // updateCycleButtonVisibility(); // selectObject calls this
 
-      // Entry animation
-      const targetScaleVal = mesh.scale.x; // Get the scale it was placed with
-      mesh.scale.setScalar(targetScaleVal * 0.1); // Start smaller
+      const targetScaleVal = mesh.scale.x;
+      mesh.scale.setScalar(targetScaleVal * 0.1);
       const animStartTime = performance.now();
       function animateEntry() {
-        if (!mesh.parent) return; // Stop if object removed
+        if (!mesh.parent) return;
         const elapsed = performance.now() - animStartTime;
         if (elapsed >= 300) {
           mesh.scale.setScalar(targetScaleVal);
           return;
         }
-        const progress = 1 - Math.pow(1 - elapsed / 300, 3); // Ease out cubic
+        const progress = 1 - Math.pow(1 - elapsed / 300, 3);
         mesh.scale.setScalar(
           targetScaleVal * 0.1 + targetScaleVal * 0.9 * progress
         );
@@ -519,7 +558,8 @@ function render(timestamp, frame) {
         originalMaterials.clear();
         lastPlacedObject = null;
         currentScale = DEFAULT_OBJECT_SCALE;
-        if (rayDebugLine) rayDebugLine.visible = false; // Hide ray on session end
+        currentSelectedIndex = -1;
+        updateCycleButtonVisibility();
       });
       hitTestSourceRequested = true;
     }
@@ -570,105 +610,32 @@ function onTouchStart(event) {
     return;
   }
 
-  if (event.touches.length === 1) {
-    tapPosition.x = (event.touches[0].clientX / window.innerWidth) * 2 - 1;
-    tapPosition.y = -(event.touches[0].clientY / window.innerHeight) * 2 + 1;
-
-    // --- MODIFICATION: Ensure camera matrices are updated from WebXR ---
-    if (renderer.xr.isPresenting) {
-      // This call updates the global 'camera' object's matrixWorld and projectionMatrix
-      // with the latest data from the XR session.
-      renderer.xr.getCamera(camera);
-    }
-    // END MODIFICATION ---
-
-    // camera.updateMatrixWorld(); // REMOVE THIS LINE or keep commented.
-    // renderer.xr.getCamera(camera) already provides the authoritative matrices.
-    // If camera.position/quaternion were stale and camera.matrixAutoUpdate is true,
-    // this could unintentionally overwrite the fresh matrixWorld.
-
-    raycaster.setFromCamera(tapPosition, camera);
-
-    // --- VISUALIZE THE RAY ---
-    if (rayDebugLine) {
-      const rayPoints = [];
-      rayPoints.push(raycaster.ray.origin.clone());
-      // MODIFICATION: Make rayDebugLine longer
-      rayPoints.push(
-        raycaster.ray.origin
-          .clone()
-          .add(raycaster.ray.direction.clone().multiplyScalar(50))
-      ); // Increased length from 10 to 50
-      rayDebugLine.geometry.setFromPoints(rayPoints);
-      rayDebugLine.geometry.attributes.position.needsUpdate = true;
-      rayDebugLine.visible = true;
-      // MODIFICATION: Removed setTimeout, ray stays visible for debugging
-    }
-    // --- END VISUALIZE THE RAY ---
-
-    const intersects = raycaster.intersectObjects(allPlacedObjects, true);
-
-    if (intersects.length > 0) {
-      let intersectedMesh = intersects[0].object;
-      let tappedObjectRoot = null;
-      let tempCurrent = intersectedMesh;
-      while (tempCurrent) {
-        if (allPlacedObjects.includes(tempCurrent)) {
-          tappedObjectRoot = tempCurrent;
-          break;
-        }
-        if (!tempCurrent.parent || tempCurrent.parent === scene) break; // Stop if we reach scene or no parent
-        tempCurrent = tempCurrent.parent;
-      }
-
-      if (tappedObjectRoot) {
-        if (selectedForManipulationObject === tappedObjectRoot) {
-          moving = true;
-          initialTouchPosition = new THREE.Vector2(
-            event.touches[0].pageX,
-            event.touches[0].pageY
-          );
-        } else {
-          selectObject(tappedObjectRoot);
-          moving = true;
-          initialTouchPosition = new THREE.Vector2(
-            event.touches[0].pageX,
-            event.touches[0].pageY
-          );
-        }
-        pinchScaling = pinchRotating = threeFingerMoving = false;
-        return;
-      } else {
-        // Intersected something, but couldn't find its root in allPlacedObjects
-        // This might happen if ray hits a child of a non-placed object, or if object hierarchy is complex
-        // console.log("Intersection with mesh, but no root found in allPlacedObjects:", intersectedMesh.name);
-        if (selectedForManipulationObject)
-          deselectObject(selectedForManipulationObject);
-      }
-    } else {
-      if (selectedForManipulationObject)
-        deselectObject(selectedForManipulationObject);
-    }
-  }
-
-  // This part handles multi-touch gestures for an *already selected* object.
-  // It does not depend on a new raycast, so it should be fine as is.
+  // If no object is selected, touch interactions on the scene (other than UI) do nothing.
   if (!selectedForManipulationObject) {
     moving = pinchScaling = pinchRotating = threeFingerMoving = false;
     return;
   }
 
-  if (event.touches.length === 3) {
-    threeFingerMoving = true;
-    initialZPosition = selectedForManipulationObject.position.y;
-    initialThreeFingerY = event.touches[0].pageY;
-    pinchScaling = pinchRotating = moving = false;
+  // At this point, an object IS selected, and the touch is NOT on a UI element.
+  // Handle gestures for the selectedForManipulationObject
+  if (event.touches.length === 1) {
+    moving = true;
+    initialTouchPosition = new THREE.Vector2(
+      event.touches[0].pageX,
+      event.touches[0].pageY
+    );
+    pinchScaling = pinchRotating = threeFingerMoving = false;
   } else if (event.touches.length === 2) {
     pinchScaling = true;
     pinchRotating = true;
     initialPinchDistance = getPinchDistance(event.touches);
     initialPinchAngle = getPinchAngle(event.touches);
     moving = threeFingerMoving = false;
+  } else if (event.touches.length === 3) {
+    threeFingerMoving = true;
+    initialZPosition = selectedForManipulationObject.position.y;
+    initialThreeFingerY = event.touches[0].pageY;
+    pinchScaling = pinchRotating = moving = false;
   }
 }
 
@@ -688,7 +655,7 @@ function onTouchMove(event) {
   ) {
     const deltaY = initialThreeFingerY - event.touches[0].pageY;
     selectedForManipulationObject.position.y =
-      initialZPosition + deltaY * 0.005; // Adjust sensitivity as needed
+      initialZPosition + deltaY * 0.005;
   } else if (
     pinchScaling &&
     event.touches.length === 2 &&
@@ -696,8 +663,7 @@ function onTouchMove(event) {
   ) {
     const newPinchDistance = getPinchDistance(event.touches);
     if (initialPinchDistance === null || initialPinchDistance === 0) {
-      // Safety check
-      initialPinchDistance = newPinchDistance; // Re-initialize if it was bad
+      initialPinchDistance = newPinchDistance;
       return;
     }
     const scaleChange = newPinchDistance / initialPinchDistance;
@@ -711,13 +677,12 @@ function onTouchMove(event) {
     if (pinchRotating) {
       const newPinchAngle = getPinchAngle(event.touches);
       if (initialPinchAngle === null) {
-        // Safety check
-        initialPinchAngle = newPinchAngle; // Re-initialize
+        initialPinchAngle = newPinchAngle;
         return;
       }
       selectedForManipulationObject.rotation.y +=
         newPinchAngle - initialPinchAngle;
-      initialPinchAngle = newPinchAngle; // Update for next frame
+      initialPinchAngle = newPinchAngle;
     }
   } else if (
     moving &&
@@ -725,7 +690,6 @@ function onTouchMove(event) {
     selectedForManipulationObject
   ) {
     if (initialTouchPosition === null) {
-      // Safety check
       initialTouchPosition = new THREE.Vector2(
         event.touches[0].pageX,
         event.touches[0].pageY
@@ -739,20 +703,19 @@ function onTouchMove(event) {
     const dxScreen = currentTouch.x - initialTouchPosition.x;
     const dyScreen = currentTouch.y - initialTouchPosition.y;
 
-    // Get camera's local right and forward vectors, projected onto the XZ plane (ground plane)
     const cameraRight = new THREE.Vector3().setFromMatrixColumn(
       camera.matrixWorld,
       0
-    ); // Camera's local X
-    cameraRight.y = 0; // Project onto XZ plane
+    );
+    cameraRight.y = 0;
     cameraRight.normalize();
 
     const cameraForward = new THREE.Vector3().setFromMatrixColumn(
       camera.matrixWorld,
       2
-    ); // Camera's local -Z
-    cameraForward.negate(); // Make it camera's forward +Z
-    cameraForward.y = 0; // Project onto XZ plane
+    );
+    cameraForward.negate();
+    cameraForward.y = 0;
     cameraForward.normalize();
 
     const worldMoveX = cameraRight
@@ -760,11 +723,11 @@ function onTouchMove(event) {
       .multiplyScalar(dxScreen * MOVE_SENSITIVITY);
     const worldMoveZ = cameraForward
       .clone()
-      .multiplyScalar(-dyScreen * MOVE_SENSITIVITY); // Inverted dyScreen for more natural up/down drag movement
+      .multiplyScalar(-dyScreen * MOVE_SENSITIVITY);
 
     selectedForManipulationObject.position.add(worldMoveX);
     selectedForManipulationObject.position.add(worldMoveZ);
-    initialTouchPosition.copy(currentTouch); // Update for next frame
+    initialTouchPosition.copy(currentTouch);
   }
 }
 
@@ -776,7 +739,7 @@ function onTouchEnd(event) {
   }
   if ((pinchScaling || pinchRotating) && event.touches.length < 2) {
     if (selectedForManipulationObject) {
-      currentScale = selectedForManipulationObject.scale.x; // Store the final scale
+      currentScale = selectedForManipulationObject.scale.x;
     }
     pinchScaling = false;
     pinchRotating = false;
@@ -788,15 +751,12 @@ function onTouchEnd(event) {
     initialTouchPosition = null;
   }
   if (event.touches.length === 0) {
-    // All fingers lifted
     threeFingerMoving = pinchScaling = pinchRotating = moving = false;
     initialPinchDistance = null;
     initialPinchAngle = null;
     initialTouchPosition = null;
     initialZPosition = null;
     initialThreeFingerY = null;
-    // Optionally, hide the rayDebugLine here if no interaction is active:
-    // if (rayDebugLine && !selectedForManipulationObject) rayDebugLine.visible = false;
   }
 }
 
