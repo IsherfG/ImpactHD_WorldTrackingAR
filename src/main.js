@@ -6,43 +6,28 @@ import "./qr.js"; // Assuming these are necessary custom modules
 import "./style.css";
 
 // --- On-Screen Logger ---
-const MAX_LOG_ENTRIES = 50; // Limit the number of entries to prevent performance issues
-let onScreenLogElement = null; // Will be assigned in init
+const MAX_LOG_ENTRIES = 50;
+let onScreenLogElement = null;
 
 function appLog(...args) {
-  // Log to console as usual
   console.log(...args);
-
-  // Log to on-screen display
   if (onScreenLogElement) {
     const message = args.map(arg => {
       if (typeof arg === 'object' && arg !== null) {
         try {
-          // Custom replacer to handle Vector3, Quaternion, Matrix4 nicely
           const replacer = (key, value) => {
-            if (value instanceof THREE.Vector3) {
-              return `Vec3(${value.x.toFixed(2)}, ${value.y.toFixed(2)}, ${value.z.toFixed(2)})`;
-            }
-            if (value instanceof THREE.Quaternion) {
-              return `Quat(${value.x.toFixed(2)}, ${value.y.toFixed(2)}, ${value.z.toFixed(2)}, ${value.w.toFixed(2)})`;
-            }
-            // Add more types if needed
-            return typeof value === 'number' && !Number.isFinite(value) ? String(value) :
-                   typeof value === 'number' ? parseFloat(value.toFixed(3)) :
-                   value;
+            if (value instanceof THREE.Vector3) return `Vec3(${value.x.toFixed(2)}, ${value.y.toFixed(2)}, ${value.z.toFixed(2)})`;
+            if (value instanceof THREE.Quaternion) return `Quat(${value.x.toFixed(2)}, ${value.y.toFixed(2)}, ${value.z.toFixed(2)}, ${value.w.toFixed(2)})`;
+            return typeof value === 'number' && !Number.isFinite(value) ? String(value) : typeof value === 'number' ? parseFloat(value.toFixed(3)) : value;
           };
           return JSON.stringify(arg, replacer, 2);
-        } catch (e) {
-          return '[Unserializable Object]';
-        }
+        } catch (e) { return '[Unserializable Object]'; }
       }
       return String(arg);
     }).join(' ');
-
     const logEntry = document.createElement('div');
     logEntry.textContent = message;
     onScreenLogElement.appendChild(logEntry);
-
     while (onScreenLogElement.childNodes.length > MAX_LOG_ENTRIES) {
       onScreenLogElement.removeChild(onScreenLogElement.firstChild);
     }
@@ -51,47 +36,37 @@ function appLog(...args) {
 }
 // --- End On-Screen Logger ---
 
-
 // --- Global Variables ---
 let container;
 let camera, scene, renderer;
 let reticle;
-
 let object1, object2, object3, object4, object5;
-
 let hitTestSource = null;
 let hitTestSourceRequested = false;
 let planeFound = false;
-
 const DEFAULT_OBJECT_SCALE = 0.2;
 let currentScale = DEFAULT_OBJECT_SCALE;
 let lastPlacedObject = null;
 let allPlacedObjects = [];
 let selectedForManipulationObject = null;
 let originalMaterials = new Map();
-
 const SELECTION_COLOR = 0xffaa00;
 const MOVE_SENSITIVITY = 0.002;
-const HDR_ENVIRONMENT_MAP_PATH = 'hdr.hdr'; // !!! REPLACE WITH YOUR HDR PATH !!!
-
+const HDR_ENVIRONMENT_MAP_PATH = 'hdr.hdr';
 let initialPinchDistance = null, pinchScaling = false;
 let initialPinchAngle = null, pinchRotating = false;
 let moving = false, initialTouchPosition = null;
 let threeFingerMoving = false, initialZPosition = null, initialThreeFingerY = null;
-
 const raycaster = new THREE.Raycaster();
 const tapPosition = new THREE.Vector2();
 let rayDebugLine = null;
-
 let selectedObject = "obj1";
 
 // --- UI Helper ---
 function updateSelectedObjectButton(selectedId) {
     document.querySelectorAll('.object-btn').forEach(btn => {
         btn.classList.remove('selected');
-        if (btn.dataset.objectId === selectedId) {
-            btn.classList.add('selected');
-        }
+        if (btn.dataset.objectId === selectedId) btn.classList.add('selected');
     });
 }
 
@@ -102,17 +77,16 @@ if ("xr" in navigator) {
     else {
         const msg = "Immersive AR not supported.";
         document.getElementById("ar-not-supported").innerHTML = msg;
-        appLog(msg); // Use appLog after it's potentially initialized
+        window.addEventListener('DOMContentLoaded', () => appLog(msg));
     }
   }).catch((err) => {
     const msg = "AR support error:";
-    document.getElementById("ar-not-supported").innerHTML = msg + " " + err.message;
-    appLog(msg, err);
+    document.getElementById("ar-not-supported").innerHTML = msg + " " + (err.message || err);
+    window.addEventListener('DOMContentLoaded', () => appLog(msg, err));
   });
 } else {
     const msg = "WebXR API not found.";
     document.getElementById("ar-not-supported").innerHTML = msg;
-    // appLog might not be ready here if init() hasn't run, so defer or ensure DOM is ready
     window.addEventListener('DOMContentLoaded', () => appLog(msg));
 }
 
@@ -126,7 +100,7 @@ function sessionStart() {
   appLog("AR Session Started.");
 }
 
-// --- Material Management for Selection ---
+// --- Material Management ---
 function storeOriginalMaterials(object) {
     if (originalMaterials.has(object)) return;
     const materialsToStore = [];
@@ -193,11 +167,8 @@ function deselectObject(object) {
 
 // --- Initialization ---
 function init() {
-  // Initialize on-screen logger element
   onScreenLogElement = document.getElementById('on-screen-logger');
-  if (!onScreenLogElement) {
-      console.error("On-screen logger element not found!");
-  }
+  if (!onScreenLogElement) console.error("On-screen logger element not found!");
 
   container = document.createElement("div"); document.body.appendChild(container);
   scene = new THREE.Scene();
@@ -208,11 +179,7 @@ function init() {
   const ambientLight = new THREE.AmbientLight(0xffffff, 0.4); scene.add(ambientLight);
   const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
   directionalLight.position.set(1.5, 2, 1).normalize(); directionalLight.castShadow = true;
-  directionalLight.shadow.mapSize.width = 1024; directionalLight.shadow.mapSize.height = 1024;
-  directionalLight.shadow.camera.near = 0.1; directionalLight.shadow.camera.far = 10;
-  directionalLight.shadow.camera.left = -2; directionalLight.shadow.camera.right = 2;
-  directionalLight.shadow.camera.top = 2; directionalLight.shadow.camera.bottom = -2;
-  directionalLight.shadow.bias = -0.001;
+  Object.assign(directionalLight.shadow, { mapSize: new THREE.Vector2(1024, 1024), camera: Object.assign(new THREE.OrthographicCamera(), { near: 0.1, far: 10, left: -2, right: 2, top: 2, bottom: -2 }), bias: -0.001 });
   scene.add(directionalLight);
 
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -237,7 +204,7 @@ function init() {
   new RGBELoader().setPath('').load(HDR_ENVIRONMENT_MAP_PATH, (texture) => {
     texture.mapping = THREE.EquirectangularReflectionMapping; scene.environment = texture;
     appLog(`Env map '${HDR_ENVIRONMENT_MAP_PATH}' loaded.`);
-  }, undefined, (err) => appLog(`HDR Load Error for '${HDR_ENVIRONMENT_MAP_PATH}':`, err));
+  }, undefined, (err) => appLog(`HDR Load Error for '${HDR_ENVIRONMENT_MAP_PATH}':`, err.message || err));
 
   const arButton = ARButton.createButton(renderer, {
     requiredFeatures: ["local", "hit-test", "dom-overlay"],
@@ -256,12 +223,8 @@ function init() {
         if (child.isMesh) {
           if (child.geometry) child.geometry.dispose();
           if (child.material) {
-            if(Array.isArray(child.material)) {
-                child.material.forEach(mat => { if(mat.map) mat.map.dispose(); mat.dispose(); });
-            } else {
-                if(child.material.map) child.material.map.dispose();
-                child.material.dispose();
-            }
+            if(Array.isArray(child.material)) child.material.forEach(mat => { if(mat.map) mat.map.dispose(); mat.dispose(); });
+            else { if(child.material.map) child.material.map.dispose(); child.material.dispose(); }
           }
         }
       });
@@ -330,10 +293,7 @@ function onSelect() {
       lastPlacedObject = mesh; allPlacedObjects.push(mesh);
       appLog("Placed object:", mesh.name, "at", newPosition);
 
-
-      if (selectedForManipulationObject && selectedForManipulationObject !== mesh) {
-        deselectObject(selectedForManipulationObject);
-      }
+      if (selectedForManipulationObject && selectedForManipulationObject !== mesh) deselectObject(selectedForManipulationObject);
       selectObject(mesh);
 
       const targetScaleVal = mesh.scale.x; mesh.scale.setScalar(targetScaleVal * 0.1);
@@ -347,12 +307,8 @@ function onSelect() {
         requestAnimationFrame(animateEntry);
       }
       requestAnimationFrame(animateEntry);
-    } else {
-        appLog("Model to clone not found for ID:", selectedObject);
-    }
-  } else {
-    appLog("Attempted to place object, but reticle not visible.");
-  }
+    } else appLog("Model to clone not found for ID:", selectedObject);
+  } else appLog("Attempted to place object, but reticle not visible.");
 }
 
 function onWindowResize() { camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); appLog("Window resized."); }
@@ -398,14 +354,12 @@ function render(timestamp, frame) {
   renderer.render(scene, camera);
 }
 
-
 // --- Helper function for logging camera state ---
 function logCameraDebugState(prefix, cam) {
     const position = new THREE.Vector3();
-    cam.matrixWorld.decompose(position, new THREE.Quaternion(), new THREE.Vector3()); // Decompose matrixWorld
+    cam.matrixWorld.decompose(position, new THREE.Quaternion(), new THREE.Vector3());
     appLog(`${prefix} - Cam World Pos: X=${position.x.toFixed(2)}, Y=${position.y.toFixed(2)}, Z=${position.z.toFixed(2)}`);
 }
-
 
 function onTouchStart(event) {
   let targetElement = event.target; let uiTap = false;
@@ -421,10 +375,7 @@ function onTouchStart(event) {
     currentElement = currentElement.parentElement;
   }
 
-  if (uiTap) {
-    appLog("UI tap ignored for raycasting.");
-    moving = pinchScaling = pinchRotating = threeFingerMoving = false; return;
-  }
+  if (uiTap) { appLog("UI tap ignored for raycasting."); moving = pinchScaling = pinchRotating = threeFingerMoving = false; return; }
 
   if (event.touches.length === 1) {
     tapPosition.x = (event.touches[0].clientX / window.innerWidth) * 2 - 1;
@@ -433,42 +384,57 @@ function onTouchStart(event) {
     appLog("--- Touch Start --- (Tap Pos:", tapPosition.x.toFixed(2), tapPosition.y.toFixed(2) + ")");
 
     if (renderer.xr.isPresenting) {
-        renderer.xr.getCamera(camera); // CRITICAL: Updates camera.matrixWorld from XR
-        logCameraDebugState("After xr.getCamera", camera); // Log the updated camera world position
+        const session = renderer.xr.getSession();
+        const referenceSpace = renderer.xr.getReferenceSpace();
+
+        if (!session) appLog("XR Session is NULL during touch!");
+        if (!referenceSpace) appLog("XR Reference Space is NULL during touch!");
+
+        if (session && referenceSpace) {
+            const xrFrame = renderer.xr.getFrame(); // Three.js's way to get the current XRFrame
+            if (xrFrame) {
+                const viewerPose = xrFrame.getViewerPose(referenceSpace);
+                if (viewerPose) {
+                    const p = viewerPose.transform.position;
+                    const o = viewerPose.transform.orientation;
+                    appLog(`XRFrame ViewerPose: P(x:${p.x.toFixed(2)}, y:${p.y.toFixed(2)}, z:${p.z.toFixed(2)}, w:${p.w.toFixed(2)}) O(x:${o.x.toFixed(2)}, y:${o.y.toFixed(2)}, z:${o.z.toFixed(2)}, w:${o.w.toFixed(2)})`);
+                } else {
+                    appLog("Could not get viewerPose from XRFrame. Tracking might be lost or session not fully ready.");
+                }
+            } else {
+                appLog("Could not get XRFrame via renderer.xr.getFrame(). This is unexpected in an active session.");
+            }
+        } else {
+            appLog("XR session or referenceSpace not available for direct pose check.");
+        }
+
+        renderer.xr.getCamera(camera); // This SHOULD update camera.matrixWorld
+        logCameraDebugState("After renderer.xr.getCamera", camera);
+
     } else {
-        appLog("Not in XR presenting mode. Camera matrix might be stale if not updated manually.");
-        // For non-XR, if camera.matrixAutoUpdate is false, you would typically call
-        // camera.updateMatrixWorld(true) if you had changed camera.position/rotation/scale
-        // and needed to update matrixWorld. But for this AR app, XR path is primary.
+        appLog("Not in XR presenting mode during onTouchStart.");
     }
 
-    raycaster.setFromCamera(tapPosition, camera); // Uses camera.matrixWorld and projectionMatrixInverse
+    raycaster.setFromCamera(tapPosition, camera);
     appLog(`Ray Origin: X=${raycaster.ray.origin.x.toFixed(2)}, Y=${raycaster.ray.origin.y.toFixed(2)}, Z=${raycaster.ray.origin.z.toFixed(2)}`);
-    // appLog(`Ray Dir: X=${raycaster.ray.direction.x.toFixed(2)}, Y=${raycaster.ray.direction.y.toFixed(2)}, Z=${raycaster.ray.direction.z.toFixed(2)}`);
 
     if (rayDebugLine) {
-      const rayPoints = [];
-      rayPoints.push(raycaster.ray.origin.clone());
-      rayPoints.push(raycaster.ray.origin.clone().add(raycaster.ray.direction.clone().multiplyScalar(50)));
+      const rayPoints = [raycaster.ray.origin.clone(), raycaster.ray.origin.clone().add(raycaster.ray.direction.clone().multiplyScalar(50))];
       rayDebugLine.geometry.setFromPoints(rayPoints);
       rayDebugLine.geometry.attributes.position.needsUpdate = true;
       rayDebugLine.visible = true;
     }
 
     const intersects = raycaster.intersectObjects(allPlacedObjects, true);
-
     if (intersects.length > 0) {
       let intersectedMesh = intersects[0].object;
       let tappedObjectRoot = null;
       let tempCurrent = intersectedMesh;
       while (tempCurrent) {
-        if (allPlacedObjects.includes(tempCurrent)) {
-          tappedObjectRoot = tempCurrent; break;
-        }
+        if (allPlacedObjects.includes(tempCurrent)) { tappedObjectRoot = tempCurrent; break; }
         if (!tempCurrent.parent || tempCurrent.parent === scene) break;
         tempCurrent = tempCurrent.parent;
       }
-      
       if (tappedObjectRoot) {
           appLog("Tapped object:", tappedObjectRoot.name || "Unnamed Object", "Dist:", intersects[0].distance.toFixed(2));
           if (selectedForManipulationObject === tappedObjectRoot) {
@@ -501,79 +467,49 @@ function onTouchStart(event) {
   }
 }
 
-
 function onTouchMove(event) {
   if (!selectedForManipulationObject && !moving && !pinchScaling && !threeFingerMoving) return;
-
   if (threeFingerMoving && event.touches.length === 3 && selectedForManipulationObject) {
     const deltaY = initialThreeFingerY - event.touches[0].pageY;
     selectedForManipulationObject.position.y = initialZPosition + (deltaY * 0.005);
   } else if (pinchScaling && event.touches.length === 2 && selectedForManipulationObject) {
     const newPinchDistance = getPinchDistance(event.touches);
-    if (initialPinchDistance === null || initialPinchDistance === 0) {
-        initialPinchDistance = newPinchDistance;
-        return;
-    }
+    if (initialPinchDistance === null || initialPinchDistance === 0) { initialPinchDistance = newPinchDistance; return; }
     const scaleChange = newPinchDistance / initialPinchDistance;
     const newObjectScale = currentScale * scaleChange;
     selectedForManipulationObject.scale.set(newObjectScale, newObjectScale, newObjectScale);
-    
     if (pinchRotating) {
       const newPinchAngle = getPinchAngle(event.touches);
-      if (initialPinchAngle === null) {
-          initialPinchAngle = newPinchAngle;
-          return;
-      }
+      if (initialPinchAngle === null) { initialPinchAngle = newPinchAngle; return; }
       selectedForManipulationObject.rotation.y += (newPinchAngle - initialPinchAngle);
       initialPinchAngle = newPinchAngle;
     }
   } else if (moving && event.touches.length === 1 && selectedForManipulationObject) {
-    if (initialTouchPosition === null) {
-        initialTouchPosition = new THREE.Vector2(event.touches[0].pageX, event.touches[0].pageY);
-        return;
-    }
+    if (initialTouchPosition === null) { initialTouchPosition = new THREE.Vector2(event.touches[0].pageX, event.touches[0].pageY); return; }
     const currentTouch = new THREE.Vector2(event.touches[0].pageX, event.touches[0].pageY);
     const dxScreen = currentTouch.x - initialTouchPosition.x;
     const dyScreen = currentTouch.y - initialTouchPosition.y;
-
     const cameraRight = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0); cameraRight.y=0; cameraRight.normalize();
     const cameraForward = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 2); cameraForward.negate(); cameraForward.y=0; cameraForward.normalize();
-
     const worldMoveX = cameraRight.clone().multiplyScalar(dxScreen * MOVE_SENSITIVITY);
     const worldMoveZ = cameraForward.clone().multiplyScalar(-dyScreen * MOVE_SENSITIVITY);
-
-    selectedForManipulationObject.position.add(worldMoveX);
-    selectedForManipulationObject.position.add(worldMoveZ);
+    selectedForManipulationObject.position.add(worldMoveX).add(worldMoveZ);
     initialTouchPosition.copy(currentTouch);
   }
 }
 
 function onTouchEnd(event) {
-  if (threeFingerMoving && event.touches.length < 3) {
-      threeFingerMoving = false;
-      initialZPosition = null; initialThreeFingerY = null;
-  }
+  if (threeFingerMoving && event.touches.length < 3) { threeFingerMoving = false; initialZPosition = null; initialThreeFingerY = null; }
   if ((pinchScaling || pinchRotating) && event.touches.length < 2) {
-    if (selectedForManipulationObject) {
-      currentScale = selectedForManipulationObject.scale.x;
-      appLog("Gesture end, currentScale updated to:", currentScale.toFixed(3));
-    }
-    pinchScaling = false; pinchRotating = false;
-    initialPinchDistance = null; initialPinchAngle = null;
+    if (selectedForManipulationObject) { currentScale = selectedForManipulationObject.scale.x; appLog("Gesture end, currentScale updated to:", currentScale.toFixed(3)); }
+    pinchScaling = false; pinchRotating = false; initialPinchDistance = null; initialPinchAngle = null;
   }
-  if (moving && event.touches.length < 1) {
-      moving = false;
-      initialTouchPosition = null;
-  }
+  if (moving && event.touches.length < 1) { moving = false; initialTouchPosition = null; }
   if (event.touches.length === 0) {
     threeFingerMoving = pinchScaling = pinchRotating = moving = false;
-    initialPinchDistance = null; initialPinchAngle = null;
-    initialTouchPosition = null;
-    initialZPosition = null; initialThreeFingerY = null;
+    initialPinchDistance = null; initialPinchAngle = null; initialTouchPosition = null; initialZPosition = null; initialThreeFingerY = null;
     appLog("--- Touch End (all fingers up) ---");
-  } else {
-    appLog(`--- Touch End (fingers left: ${event.touches.length}) ---`);
-  }
+  } else appLog(`--- Touch End (fingers left: ${event.touches.length}) ---`);
 }
 
 function getPinchDistance(touches) { return Math.hypot(touches[0].pageX - touches[1].pageX, touches[0].pageY - touches[1].pageY); }
