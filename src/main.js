@@ -315,7 +315,7 @@ function onWindowResize() { camera.aspect = window.innerWidth/window.innerHeight
 function animate() { renderer.setAnimationLoop(render); }
 
 function render(timestamp, frame) {
-  if (frame) {
+  if (frame) { // `frame` here is the XRFrame, passed by setAnimationLoop
     const referenceSpace = renderer.xr.getReferenceSpace(); const session = renderer.xr.getSession();
     if (hitTestSourceRequested === false && session) {
       session.requestReferenceSpace("viewer").then((viewerRefSpace) => {
@@ -337,7 +337,7 @@ function render(timestamp, frame) {
       hitTestSourceRequested = true;
     }
     if (hitTestSource && referenceSpace) {
-        const hitTestResults = frame.getHitTestResults(hitTestSource);
+        const hitTestResults = frame.getHitTestResults(hitTestSource); // Use the XRFrame from render loop
         if(hitTestResults.length){
             if(!planeFound){
                 planeFound = true;
@@ -351,6 +351,9 @@ function render(timestamp, frame) {
         } else { reticle.visible = false; }
     }
   }
+  // Three.js's WebXRManager calls its internal updateCamera method
+  // before rendering if camera.matrixAutoUpdate is false.
+  // This internal updateCamera uses the XRFrame from the render loop.
   renderer.render(scene, camera);
 }
 
@@ -382,35 +385,15 @@ function onTouchStart(event) {
     tapPosition.y = -(event.touches[0].clientY / window.innerHeight) * 2 + 1;
 
     appLog("--- Touch Start --- (Tap Pos:", tapPosition.x.toFixed(2), tapPosition.y.toFixed(2) + ")");
+    logCameraDebugState("Before renderer.xr.getCamera", camera); // Log state BEFORE the update
 
     if (renderer.xr.isPresenting) {
-        const session = renderer.xr.getSession();
-        const referenceSpace = renderer.xr.getReferenceSpace();
-
-        if (!session) appLog("XR Session is NULL during touch!");
-        if (!referenceSpace) appLog("XR Reference Space is NULL during touch!");
-
-        if (session && referenceSpace) {
-            const xrFrame = renderer.xr.getFrame(); // Three.js's way to get the current XRFrame
-            if (xrFrame) {
-                const viewerPose = xrFrame.getViewerPose(referenceSpace);
-                if (viewerPose) {
-                    const p = viewerPose.transform.position;
-                    const o = viewerPose.transform.orientation;
-                    appLog(`XRFrame ViewerPose: P(x:${p.x.toFixed(2)}, y:${p.y.toFixed(2)}, z:${p.z.toFixed(2)}, w:${p.w.toFixed(2)}) O(x:${o.x.toFixed(2)}, y:${o.y.toFixed(2)}, z:${o.z.toFixed(2)}, w:${o.w.toFixed(2)})`);
-                } else {
-                    appLog("Could not get viewerPose from XRFrame. Tracking might be lost or session not fully ready.");
-                }
-            } else {
-                appLog("Could not get XRFrame via renderer.xr.getFrame(). This is unexpected in an active session.");
-            }
-        } else {
-            appLog("XR session or referenceSpace not available for direct pose check.");
-        }
-
-        renderer.xr.getCamera(camera); // This SHOULD update camera.matrixWorld
-        logCameraDebugState("After renderer.xr.getCamera", camera);
-
+        // This is THE critical call. It should update camera.matrixWorld
+        // with the latest pose data the WebXRManager has.
+        // WebXRManager should have updated its internal camera state from the latest XRFrame
+        // during the last call to renderer.render() (via setAnimationLoop).
+        renderer.xr.getCamera(camera);
+        logCameraDebugState("After renderer.xr.getCamera", camera); // Log state AFTER the update
     } else {
         appLog("Not in XR presenting mode during onTouchStart.");
     }
