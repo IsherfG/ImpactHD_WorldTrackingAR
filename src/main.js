@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { ARButton } from "three/examples/jsm/webxr/ARButton.js"; // Standard, but its role might be diminished by SDK
+import { ARButton } from "three/examples/jsm/webxr/ARButton.js";
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import "./qr.js";
 import "./style.css";
@@ -10,7 +10,7 @@ const MAX_LOG_ENTRIES = 50;
 let onScreenLogElement = null;
 
 function appLog(...args) {
-  console.log(...args); // Keep console logging
+  console.log(...args);
   if (onScreenLogElement) {
     const message = args.map(arg => {
       if (typeof arg === 'object' && arg !== null) {
@@ -38,30 +38,31 @@ function appLog(...args) {
 
 // --- Global Variables ---
 let container;
-let camera, scene, renderer; // Your main camera, scene, renderer
-let reticle; // For ARButton's hit-testing, may or may not be used by SDK
+let camera, scene, renderer;
+let reticle;
 let object1, object2, object3, object4, object5;
 let hitTestSource = null;
 let hitTestSourceRequested = false;
-let planeFound = false;
+let planeFound = false; // For ARButton UI
 const DEFAULT_OBJECT_SCALE = 0.2;
-let currentScale = DEFAULT_OBJECT_SCALE;
-let lastPlacedObject = null;
+let currentScale = DEFAULT_OBJECT_SCALE; // Used for new placements and as base for scaling gestures
+let lastPlacedObject = null; // Mostly for reference, selection handles current object
 let allPlacedObjects = [];
 let selectedForManipulationObject = null;
 let originalMaterials = new Map();
 const SELECTION_COLOR = 0xffaa00;
-const MOVE_SENSITIVITY = 0.002;
+const MOVE_SENSITIVITY = 0.0015; // Adjusted sensitivity
 const HDR_ENVIRONMENT_MAP_PATH = 'hdr.hdr';
-let initialPinchDistance = null, pinchScaling = false;
-let initialPinchAngle = null, pinchRotating = false;
-let moving = false, initialTouchPosition = null;
-let threeFingerMoving = false, initialZPosition = null, initialThreeFingerY = null;
-const raycaster = new THREE.Raycaster();
-const tapPosition = new THREE.Vector2();
+let initialPinchDistance = null, pinchScaling = false; // For pinch scale
+let initialTwoFingerAngle = null, pinchRotating = false; // For two-finger rotate
+let moving = false, initialTouchPosition = null; // For 1-finger drag move
+let threeFingerMoving = false, initialZPosition = null, initialThreeFingerY = null; // For 3-finger Z move
+const raycaster = new THREE.Raycaster(); // Still used for ARButton hit-test for placement
+const tapPosition = new THREE.Vector2(); // For ARButton hit-test screen coords
 let rayDebugLine = null;
-let selectedObject = "obj1";
-let lastFoundSDKCamera = null;
+let selectedObject = "obj1"; // ID of object type to place
+let currentObjectIndex = -1; // Index for cycling through placed objects
+let lastFoundSDKCamera = null; // To store a potential SDK camera
 
 // --- UI Helper ---
 function updateSelectedObjectButton(selectedId) {
@@ -71,9 +72,24 @@ function updateSelectedObjectButton(selectedId) {
     });
 }
 
-// --- WebXR Support & Session Check (Minimal) ---
-// We assume Variant Launch SDK (from script tag) handles actual session start.
-// This just checks for basic browser support.
+function updateUIForSelection() {
+    const hasPlacedObjects = allPlacedObjects.length > 0;
+    const objectIsSelected = selectedForManipulationObject !== null;
+
+    const prevBtn = document.getElementById("prev-object-btn");
+    const nextBtn = document.getElementById("next-object-btn");
+    const deleteBtn = document.getElementById("delete-object-btn");
+
+    if (prevBtn) prevBtn.style.display = hasPlacedObjects && allPlacedObjects.length > 1 ? "flex" : "none";
+    if (nextBtn) nextBtn.style.display = hasPlacedObjects && allPlacedObjects.length > 1 ? "flex" : "none";
+    if (deleteBtn) deleteBtn.style.display = objectIsSelected ? "flex" : "none";
+
+    // Example for other manipulation buttons:
+    // const scaleUpBtn = document.getElementById("scale-up-btn");
+    // if(scaleUpBtn) scaleUpBtn.style.display = objectIsSelected ? "flex" : "none";
+}
+
+// --- WebXR Support & Session Check ---
 if ("xr" in navigator) {
   navigator.xr.isSessionSupported("immersive-ar").then((supported) => {
     if (supported) {
@@ -84,7 +100,7 @@ if ("xr" in navigator) {
         document.getElementById("ar-not-supported").innerHTML = msg;
         appLog(msg);
     }
-    init(); // Always init Three.js scene setup
+    init();
     animate();
   }).catch((err) => {
     const msg = "AR support check error:";
@@ -101,19 +117,28 @@ if ("xr" in navigator) {
     animate();
 }
 
-// sessionStart for ARButton - may not be relevant if Variant Launch controls the session.
-function sessionStart() {
-  planeFound = false; // Reset ARButton specific flags
+function sessionStart() { // For ARButton
+  planeFound = false;
   document.getElementById("tracking-prompt").style.display = "flex";
   document.getElementById("bottom-controls").style.display = "none";
-  if (selectedForManipulationObject) deselectObject(selectedForManipulationObject);
-  document.getElementById("delete-object-btn").style.display = "none";
+  if (selectedForManipulationObject) deselectObject(selectedForManipulationObject); // Deselect on session start
+  // No, don't deselect here, keep selection if session restarts.
+  // else if (selectedForManipulationObject) highlightSelectedObject(selectedForManipulationObject);
+
+  document.getElementById("delete-object-btn").style.display = selectedForManipulationObject ? "flex" : "none";
+  updateUIForSelection();
+
   if (rayDebugLine) rayDebugLine.visible = false;
   appLog("ARButton: XR Session Started (if ARButton was used).");
 }
 
-// --- Material Management ---
-// ... (These functions are fine and self-contained: storeOriginalMaterials, restoreOriginalMaterials, highlightSelectedObject, selectObject, deselectObject)
+// --- Material Management & Selection ---
+function storeOriginalMaterials(object) { /* ... as before ... */ }
+function restoreOriginalMaterials(object) { /* ... as before ... */ }
+function highlightSelectedObject(object) { /* ... as before ... */ }
+// storeOriginalMaterials, restoreOriginalMaterials, highlightSelectedObject are the same as your last correct version.
+// Make sure they are included. For brevity, I'm omitting their full bodies here if unchanged.
+// Re-adding them for completeness:
 function storeOriginalMaterials(object) {
     if (originalMaterials.has(object)) return;
     const materialsToStore = [];
@@ -155,25 +180,60 @@ function highlightSelectedObject(object) {
         }
     });
 }
-function selectObject(object) {
-    if (selectedForManipulationObject === object) return;
-    if (selectedForManipulationObject) deselectObject(selectedForManipulationObject);
-    selectedForManipulationObject = object;
-    highlightSelectedObject(object);
-    document.getElementById("delete-object-btn").style.display = "flex";
-    currentScale = selectedForManipulationObject.scale.x;
-    appLog("Selected for manipulation:", object.name || "Unnamed Object");
-}
-function deselectObject(object) {
-    if (!object) return;
-    restoreOriginalMaterials(object);
-    if (selectedForManipulationObject === object) {
-        appLog("Deselected:", object.name || "Unnamed Object");
-        selectedForManipulationObject = null;
-        document.getElementById("delete-object-btn").style.display = "none";
+
+
+function selectObject(object, newIndex = -1) {
+    if (selectedForManipulationObject === object && object !== null) return; // Already selected
+
+    if (selectedForManipulationObject) { // Deselect previous without UI update yet
+        restoreOriginalMaterials(selectedForManipulationObject);
     }
+
+    selectedForManipulationObject = object;
+
+    if (object) {
+        highlightSelectedObject(object);
+        currentScale = object.scale.x; // Update global currentScale from selected object
+        if (newIndex !== -1) {
+            currentObjectIndex = newIndex;
+        } else {
+            // If called without index, find it (e.g. if selection happened some other way)
+            currentObjectIndex = allPlacedObjects.indexOf(object);
+        }
+        appLog("Selected:", object.name || "Unnamed", "Index:", currentObjectIndex);
+    } else {
+        // No object is selected (e.g. after deleting the last one)
+        currentObjectIndex = -1;
+        appLog("No object selected.");
+    }
+    updateUIForSelection();
 }
 
+function deselectCurrentObject() { // Deselects the currently selected object
+    if (selectedForManipulationObject) {
+        const temp = selectedForManipulationObject;
+        selectedForManipulationObject = null; // Clear selection first
+        restoreOriginalMaterials(temp);
+        appLog("Deselected:", temp.name || "Unnamed");
+        currentObjectIndex = -1; // No object actively indexed by cycle
+    }
+    updateUIForSelection();
+}
+
+// --- Cycle Selection Functions ---
+function selectNextObject() {
+    if (allPlacedObjects.length === 0) { deselectCurrentObject(); return; }
+    currentObjectIndex++;
+    if (currentObjectIndex >= allPlacedObjects.length) currentObjectIndex = 0;
+    selectObject(allPlacedObjects[currentObjectIndex], currentObjectIndex);
+}
+
+function selectPreviousObject() {
+    if (allPlacedObjects.length === 0) { deselectCurrentObject(); return; }
+    currentObjectIndex--;
+    if (currentObjectIndex < 0) currentObjectIndex = allPlacedObjects.length - 1;
+    selectObject(allPlacedObjects[currentObjectIndex], currentObjectIndex);
+}
 
 // --- Initialization ---
 function init() {
@@ -183,10 +243,9 @@ function init() {
   container = document.createElement("div"); document.body.appendChild(container);
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
-  camera.name = "MyMainCamera"; // Give your camera a name for easier identification
-  camera.matrixAutoUpdate = false; // Important if we were to manage it via Three.js XR
-
-  appLog("Main camera created:", camera.name, camera.uuid);
+  camera.name = "MyMainCamera";
+  camera.matrixAutoUpdate = false;
+  appLog("Main camera created:", camera.name, camera.uuid.substring(0,8));
 
   const hemiLight = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 0.6); scene.add(hemiLight);
   const ambientLight = new THREE.AmbientLight(0xffffff, 0.4); scene.add(ambientLight);
@@ -198,7 +257,7 @@ function init() {
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(window.devicePixelRatio);
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.xr.enabled = true; // Enable XR on the renderer is standard
+  renderer.xr.enabled = true;
   renderer.outputEncoding = THREE.sRGBEncoding;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
@@ -206,24 +265,16 @@ function init() {
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   container.appendChild(renderer.domElement);
 
-  // ARButton - Standard Three.js way to enter XR.
-  // The Variant Launch SDK (from script tag in HTML) might provide its own AR entry UI/method.
-  // If Variant Launch starts AR automatically or has its own button, this ARButton might be
-  // redundant or could even conflict. For now, it's a way to try and trigger an XR session
-  // to see if our camera finding logic works within any active session.
   renderer.xr.addEventListener("sessionstart", sessionStart);
   const arButton = ARButton.createButton(renderer, {
     requiredFeatures: ["local", "hit-test", "dom-overlay"],
     domOverlay: { root: document.querySelector("#overlay") },
   });
-  // Add ARButton to allow user to try and start a session if SDK doesn't auto-start.
-  // This might be hidden or removed if SDK provides its own UI.
-  if (!document.getElementById('ar-button')) { // Simple check to avoid adding multiple if re-run
-      arButton.id = 'ar-button';
+  if (!document.getElementById('ar-button')) {
+      arButton.id = 'ar-button'; // Give it an ID to prevent duplicates if init is called again
       document.body.appendChild(arButton);
       appLog("ARButton created and added to body.");
   }
-
 
   const lineMaterial = new THREE.LineBasicMaterial({ color: 0xff00ff, linewidth: 5 });
   const points = [new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,-1)];
@@ -237,28 +288,51 @@ function init() {
     appLog(`Env map '${HDR_ENVIRONMENT_MAP_PATH}' loaded.`);
   }, undefined, (err) => appLog(`HDR Load Error for '${HDR_ENVIRONMENT_MAP_PATH}':`, err.message || err));
 
-
-  document.getElementById("place-object-btn").addEventListener("click", onSelect);
+  document.getElementById("place-object-btn").addEventListener("click", onSelectPlace);
   document.getElementById("delete-object-btn").addEventListener("click", () => {
     if (selectedForManipulationObject) {
       const objectName = selectedForManipulationObject.name || "Unnamed Object";
-      scene.remove(selectedForManipulationObject);
-      allPlacedObjects = allPlacedObjects.filter(obj => obj !== selectedForManipulationObject);
+      const indexToRemove = allPlacedObjects.indexOf(selectedForManipulationObject);
+
+      // Dispose materials and geometries
       originalMaterials.delete(selectedForManipulationObject);
       selectedForManipulationObject.traverse(child => {
         if (child.isMesh) {
           if (child.geometry) child.geometry.dispose();
           if (child.material) {
-            if(Array.isArray(child.material)) child.material.forEach(mat => { if(mat.map) mat.map.dispose(); mat.dispose(); });
-            else { if(child.material.map) child.material.map.dispose(); child.material.dispose(); }
+            if (Array.isArray(child.material)) {
+              child.material.forEach(mat => { if (mat.map) mat.map.dispose(); mat.dispose(); });
+            } else {
+              if (child.material.map) child.material.map.dispose();
+              child.material.dispose();
+            }
           }
         }
       });
-      selectedForManipulationObject = null;
-      document.getElementById("delete-object-btn").style.display = "none";
+      scene.remove(selectedForManipulationObject);
+      allPlacedObjects.splice(indexToRemove, 1);
+      
       appLog("Object deleted:", objectName);
+
+      if (allPlacedObjects.length > 0) {
+          currentObjectIndex = Math.max(0, indexToRemove -1); // Try to select previous
+          if (currentObjectIndex >= allPlacedObjects.length) { // If last was deleted, or index was 0
+            currentObjectIndex = allPlacedObjects.length > 0 ? 0 : -1;
+          }
+          if(currentObjectIndex !== -1 && allPlacedObjects[currentObjectIndex]) {
+            selectObject(allPlacedObjects[currentObjectIndex], currentObjectIndex);
+          } else {
+            selectObject(null); // No objects left or invalid index
+          }
+      } else {
+          selectObject(null); // No objects left
+      }
     }
   });
+
+  document.getElementById("next-object-btn").addEventListener("click", selectNextObject);
+  document.getElementById("prev-object-btn").addEventListener("click", selectPreviousObject);
+
   document.querySelectorAll('.object-btn').forEach(button => {
     button.addEventListener('click', (event) => {
         event.stopPropagation(); selectedObject = button.dataset.objectId; updateSelectedObjectButton(selectedObject);
@@ -289,11 +363,11 @@ function init() {
   window.addEventListener("touchmove", onTouchMove, { passive: false });
   window.addEventListener("touchend", onTouchEnd, false);
   appLog("Initialization complete. Main camera matrixAutoUpdate:", camera.matrixAutoUpdate);
+  updateUIForSelection();
 }
 
-// onSelect for custom object placement using ARButton's reticle
-function onSelect() {
-  if (reticle.visible) { // Reticle is from ARButton's hit-test logic
+function onSelectPlace() { // For placing new objects
+  if (reticle.visible) {
     let modelToClone;
     if (selectedObject === "obj1" && object1) modelToClone = object1;
     else if (selectedObject === "obj2" && object2) modelToClone = object2;
@@ -310,7 +384,8 @@ function onSelect() {
       const newPosition = new THREE.Vector3(); const newQuaternion = new THREE.Quaternion();
       reticle.matrix.decompose(newPosition, newQuaternion, new THREE.Vector3());
       mesh.position.copy(newPosition); mesh.quaternion.copy(newQuaternion);
-      mesh.scale.set(currentScale, currentScale, currentScale);
+      mesh.scale.set(DEFAULT_OBJECT_SCALE, DEFAULT_OBJECT_SCALE, DEFAULT_OBJECT_SCALE); // Use default scale for new objects
+      currentScale = DEFAULT_OBJECT_SCALE; // Reset global currentScale
 
       let activeCamera = findPossibleSDKCamera(scene, camera) || camera;
       const camLookAt = new THREE.Vector3();
@@ -318,11 +393,10 @@ function onSelect() {
       mesh.lookAt(camLookAt.x, mesh.position.y, camLookAt.z);
 
       scene.add(mesh);
-      lastPlacedObject = mesh; allPlacedObjects.push(mesh);
-      appLog("Placed object (custom via ARButton reticle):", mesh.name, "at", newPosition);
-
-      if (selectedForManipulationObject && selectedForManipulationObject !== mesh) deselectObject(selectedForManipulationObject);
-      selectObject(mesh);
+      allPlacedObjects.push(mesh);
+      lastPlacedObject = mesh;
+      selectObject(mesh, allPlacedObjects.length - 1); // Select the newly placed object
+      appLog("Placed object:", mesh.name, "at", newPosition);
 
       const targetScaleVal = mesh.scale.x; mesh.scale.setScalar(targetScaleVal * 0.1);
       const animStartTime = performance.now();
@@ -336,70 +410,62 @@ function onSelect() {
       }
       requestAnimationFrame(animateEntry);
     } else appLog("Model to clone not found for ID:", selectedObject);
-  } else appLog("Attempted to place (custom), but ARButton reticle not visible.");
+  } else appLog("Attempted to place, but ARButton reticle not visible.");
 }
 
 function onWindowResize() { camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); appLog("Window resized."); }
 
-function animate() {
-  renderer.setAnimationLoop(render);
-}
+function animate() { renderer.setAnimationLoop(render); }
 
-// render loop
-function render(timestamp, frame) { // `frame` is XRFrame if in XR session started by ARButton
-  // Hit-test logic for ARButton (may be irrelevant if SDK handles placement/interaction)
-  if (renderer.xr.isPresenting && frame && hitTestSourceRequested) {
+function render(timestamp, frame) {
+  if (renderer.xr.isPresenting && frame && hitTestSourceRequested && hitTestSource) {
     const referenceSpace = renderer.xr.getReferenceSpace();
-    if (hitTestSource && referenceSpace) {
+    if (referenceSpace) {
         const hitTestResults = frame.getHitTestResults(hitTestSource);
         if(hitTestResults.length){
-            if(!planeFound){ // This planeFound is for ARButton's UI
+            if(!planeFound){
                 planeFound = true;
                 document.getElementById("tracking-prompt").style.display = "none";
                 document.getElementById("bottom-controls").style.display = "flex";
                 appLog("ARButton: Plane found, controls visible.");
+                updateUIForSelection(); // Update UI once controls are visible
             }
             const hit = hitTestResults[0]; const pose = hit.getPose(referenceSpace);
             if(pose){ reticle.visible = true; reticle.matrix.fromArray(pose.transform.matrix); }
             else { reticle.visible = false;}
         } else { reticle.visible = false; }
     }
-  } else if (!renderer.xr.isPresenting && planeFound) { // If session ended, hide ARButton UI
+  } else if (!renderer.xr.isPresenting && planeFound) {
       planeFound = false;
-      document.getElementById("tracking-prompt").style.display = "flex"; // Or hide, depending on desired state
+      document.getElementById("tracking-prompt").style.display = "flex";
       document.getElementById("bottom-controls").style.display = "none";
       reticle.visible = false;
+      updateUIForSelection(); // Update UI when session ends
+  }
+  if (renderer.xr.isPresenting && !hitTestSourceRequested && renderer.xr.getSession()) { // Setup hitTestSource if session active
+      const session = renderer.xr.getSession();
+      session.requestReferenceSpace("viewer").then((viewerRefSpace) => {
+        session.requestHitTestSource({ space: viewerRefSpace })
+          .then((source) => { hitTestSource = source; appLog("ARButton: Hit test source obtained in render."); })
+          .catch(err => appLog("ARButton: Hit test source error in render:", err.message || err));
+      }).catch(err => appLog("ARButton: Viewer ref space error in render:", err.message || err));
+      hitTestSourceRequested = true; // Prevent re-requesting
   }
 
 
-  // Determine which camera to render with
-  let cameraToRenderWith = camera; // Default to your main camera
-  if (renderer.xr.isPresenting) { // Or a check for Variant Launch session activity
-      const sdkCam = findPossibleSDKCamera(scene, camera);
-      if (sdkCam) {
-          cameraToRenderWith = sdkCam;
-      }
-      // If using standard Three.js XR via ARButton, renderer.render will internally use
-      // the XR camera views if your main `camera` is the one associated with renderer.xr.camera.
-      // If an SDK provides `sdkCam`, and it's the *actual* AR camera, we'd want to use that.
-      // This line becomes complex with an SDK potentially managing the renderer.
-  }
+  let cameraToRenderWith = findPossibleSDKCamera(scene, camera) || camera;
   renderer.render(scene, cameraToRenderWith);
 }
 
-
-// --- Helper function to find a potential SDK-managed camera ---
 function findPossibleSDKCamera(sceneRef, yourCameraRef) {
     let foundCamera = null;
     sceneRef.traverse(object => {
-        if (foundCamera) return; // Optimization: stop if already found
+        if (foundCamera) return;
         if (object.isCamera && object !== yourCameraRef) {
-            // Heuristic: try to avoid internal/default cameras if they have common names.
-            // SDK camera might be unnamed or have a generic name.
             const name = object.name ? object.name.toLowerCase() : '';
             if (!name.includes("renderer") && !name.includes("default")) {
                 foundCamera = object;
-            } else if (!object.name) { // Unnamed cameras are also candidates
+            } else if (!object.name) {
                 foundCamera = object;
             }
         }
@@ -407,15 +473,9 @@ function findPossibleSDKCamera(sceneRef, yourCameraRef) {
     return foundCamera;
 }
 
-// --- Helper function for logging camera state ---
 function logCameraDebugState(prefix, cam) {
-    if (!cam) {
-        appLog(`${prefix} - Camera object is null.`);
-        return;
-    }
+    if (!cam) { appLog(`${prefix} - Camera object is null.`); return; }
     const position = new THREE.Vector3();
-    // ASSUMPTION: cam.matrixWorld is up-to-date by the time this is called.
-    // If SDK camera, SDK updates it. If our camera, renderer.xr.getCamera() or manual update.
     cam.matrixWorld.decompose(position, new THREE.Quaternion(), new THREE.Vector3());
     appLog(`${prefix} - Cam Name: ${cam.name || 'UnnamedCam'}, UUID: ${cam.uuid.substring(0,8)}, World Pos: X=${position.x.toFixed(2)}, Y=${position.y.toFixed(2)}, Z=${position.z.toFixed(2)}`);
 }
@@ -428,177 +488,138 @@ function onTouchStart(event) {
         currentElement.id === 'object-selector' ||
         currentElement.id === 'action-buttons' ||
         currentElement.closest('.object-btn') ||
-        currentElement.closest('.action-btn')) {
+        currentElement.closest('.action-btn') ||
+        currentElement.id === 'ar-button') { // Ignore ARButton itself
       uiTap = true; break;
     }
     currentElement = currentElement.parentElement;
   }
 
-  if (uiTap) { appLog("UI tap ignored for raycasting."); moving = pinchScaling = pinchRotating = threeFingerMoving = false; return; }
+  if (uiTap) { appLog("UI tap ignored."); moving = pinchScaling = pinchRotating = threeFingerMoving = false; return; }
+
+  const xrIsPresenting = renderer.xr.isPresenting;
 
   if (event.touches.length === 1) {
-    tapPosition.x = (event.touches[0].clientX / window.innerWidth) * 2 - 1;
-    tapPosition.y = -(event.touches[0].clientY / window.innerHeight) * 2 + 1;
-
-    appLog("--- Touch Start --- (Tap Pos:", tapPosition.x.toFixed(2), tapPosition.y.toFixed(2) + ")");
-
-    let cameraForRaycast = camera; // Default to your main camera
-
-    // Check if an XR session is active (could be via ARButton or Variant Launch SDK)
-    const xrIsPresenting = renderer.xr.isPresenting; // Standard Three.js check
-    appLog(`XR Presenting (Three.js check): ${xrIsPresenting}`);
-
-    if (xrIsPresenting) {
-        appLog("Attempting to use best available camera for raycast in XR...");
-        const sdkCamera = findPossibleSDKCamera(scene, camera);
-
-        if (sdkCamera) {
-            if (lastFoundSDKCamera !== sdkCamera) { // Log only if it's a new find or first find
-                appLog("Found a potential SDK camera in scene:", sdkCamera.name || 'UnnamedSDKCam', `UUID: ${sdkCamera.uuid.substring(0,8)}`);
-                lastFoundSDKCamera = sdkCamera;
-            }
-            // We ASSUME the SDK keeps this camera's matrixWorld updated for its own AR rendering.
-            logCameraDebugState("SDK Camera State (assumed updated by SDK)", sdkCamera);
-            cameraForRaycast = sdkCamera;
-        } else {
-            appLog("No other camera found in scene. Falling back to main 'MyMainCamera'.");
-            if (lastFoundSDKCamera) { // If we previously found one and now it's gone
-                appLog("Previously found SDK camera is no longer in the scene.");
-                lastFoundSDKCamera = null;
-            }
-            // If no SDK camera, try updating 'MyMainCamera' using Three.js's XR system.
-            // This was the part that was previously failing (staying at 0,0,0).
-            logCameraDebugState("MyMainCamera State (before renderer.xr.getCamera)", camera);
-            renderer.xr.getCamera(camera); // Attempt to update 'MyMainCamera' from XR session
-            logCameraDebugState("MyMainCamera State (after renderer.xr.getCamera)", camera);
-            cameraForRaycast = camera;
+    if (selectedForManipulationObject) {
+        appLog("--- Touch Start (1 finger, object selected) --- Potential Move Start");
+        moving = true;
+        initialTouchPosition = new THREE.Vector2(event.touches[0].clientX, event.touches[0].clientY);
+        if(xrIsPresenting) {
+            let camCheck = findPossibleSDKCamera(scene, camera) || camera;
+            if(camCheck === camera) renderer.xr.getCamera(camera);
+            logCameraDebugState("Ref Cam for Move", camCheck);
         }
+        event.preventDefault();
     } else {
-        appLog("Not in XR presenting mode (by Three.js check). Using 'MyMainCamera'.");
-        // In a non-XR scenario, if camera.matrixAutoUpdate is false, you'd call
-        // camera.updateMatrixWorld(true) if you changed camera.position/rotation/scale.
-        cameraForRaycast = camera;
+        appLog("--- Touch Start (1 finger, NO object selected) ---");
+        moving = false;
+        // Optionally, if a tap on empty space should deselect any selected object:
+        // deselectCurrentObject();
     }
-
-    if (cameraForRaycast) {
-        // Ensure the chosen camera's matrixWorld is truly up-to-date before raycasting.
-        // For an SDK camera, we rely on the SDK.
-        // For 'MyMainCamera', renderer.xr.getCamera() should handle it in XR.
-        // An explicit cameraForRaycast.updateMatrixWorld() might be needed if only local
-        // transforms were set and matrixAutoUpdate is false, but less likely for XR poses.
-        raycaster.setFromCamera(tapPosition, cameraForRaycast);
-        appLog(`Raycasting with camera: ${cameraForRaycast.name || cameraForRaycast.uuid.substring(0,8)}`);
-        appLog(`Ray Origin: X=${raycaster.ray.origin.x.toFixed(2)}, Y=${raycaster.ray.origin.y.toFixed(2)}, Z=${raycaster.ray.origin.z.toFixed(2)}`);
-    } else {
-        appLog("Cannot raycast, no valid camera determined.");
-        if (rayDebugLine) rayDebugLine.visible = false;
-        return;
-    }
-
-    if (rayDebugLine) {
-      const rayPoints = [raycaster.ray.origin.clone(), raycaster.ray.origin.clone().add(raycaster.ray.direction.clone().multiplyScalar(50))];
-      rayDebugLine.geometry.setFromPoints(rayPoints);
-      rayDebugLine.geometry.attributes.position.needsUpdate = true;
-      rayDebugLine.visible = true;
-    }
-
-    const intersects = raycaster.intersectObjects(allPlacedObjects, true);
-    if (intersects.length > 0) {
-      let intersectedMesh = intersects[0].object;
-      let tappedObjectRoot = null;
-      let tempCurrent = intersectedMesh;
-      while (tempCurrent) {
-        if (allPlacedObjects.includes(tempCurrent)) { tappedObjectRoot = tempCurrent; break; }
-        if (!tempCurrent.parent || tempCurrent.parent === scene) break;
-        tempCurrent = tempCurrent.parent;
-      }
-      if (tappedObjectRoot) {
-          appLog("Tapped object:", tappedObjectRoot.name || "Unnamed", "Dist:", intersects[0].distance.toFixed(2));
-          if (selectedForManipulationObject === tappedObjectRoot) {
-              moving = true; initialTouchPosition = new THREE.Vector2(event.touches[0].pageX, event.touches[0].pageY);
-          } else {
-              selectObject(tappedObjectRoot);
-              moving = true; initialTouchPosition = new THREE.Vector2(event.touches[0].pageX, event.touches[0].pageY);
-          }
-          pinchScaling = pinchRotating = threeFingerMoving = false; return;
-      } else {
-          if (selectedForManipulationObject) deselectObject(selectedForManipulationObject);
-          appLog("Intersection with non-root mesh. Deselecting.");
-      }
-    } else {
-      if (selectedForManipulationObject) deselectObject(selectedForManipulationObject);
-      appLog("No intersection with placed objects. Deselecting if any selected.");
-    }
-  }
-
-  if (!selectedForManipulationObject) { moving = pinchScaling = pinchRotating = threeFingerMoving = false; return; }
-  if (event.touches.length === 3) {
-    appLog("3-finger touch start for Z move.");
-    threeFingerMoving = true; initialZPosition = selectedForManipulationObject.position.y; initialThreeFingerY = event.touches[0].pageY;
-    pinchScaling = pinchRotating = moving = false;
-  } else if (event.touches.length === 2) {
-    appLog("2-finger touch start for scale/rotate.");
-    pinchScaling = true; pinchRotating = true; initialPinchDistance = getPinchDistance(event.touches); initialPinchAngle = getPinchAngle(event.touches);
-    moving = threeFingerMoving = false;
+  } else if (event.touches.length === 2 && selectedForManipulationObject) {
+    appLog("--- Touch Start (2 fingers, object selected) --- Pinch/Rotate Start");
+    moving = false; // Ensure 1-finger move stops
+    pinchScaling = true;
+    pinchRotating = true; // Allow both simultaneously
+    initialPinchDistance = getPinchDistance(event.touches);
+    initialTwoFingerAngle = getTwoFingerAngle(event.touches); // Use a different function for angle
+    currentScale = selectedForManipulationObject.scale.x; // Store current scale at gesture start
+    event.preventDefault();
+  } else if (event.touches.length === 3 && selectedForManipulationObject) {
+    appLog("--- Touch Start (3 fingers, object selected) --- Z-Move Start");
+    moving = pinchScaling = pinchRotating = false;
+    threeFingerMoving = true;
+    initialZPosition = selectedForManipulationObject.position.y;
+    initialThreeFingerY = event.touches[0].clientY; // Use clientY for up/down screen motion
+    event.preventDefault();
+  } else {
+    moving = pinchScaling = pinchRotating = threeFingerMoving = false;
   }
 }
 
 function onTouchMove(event) {
-  if (!selectedForManipulationObject && !moving && !pinchScaling && !threeFingerMoving) return;
-  if (threeFingerMoving && event.touches.length === 3 && selectedForManipulationObject) {
-    const deltaY = initialThreeFingerY - event.touches[0].pageY;
-    selectedForManipulationObject.position.y = initialZPosition + (deltaY * 0.005);
-  } else if (pinchScaling && event.touches.length === 2 && selectedForManipulationObject) {
-    const newPinchDistance = getPinchDistance(event.touches);
-    if (initialPinchDistance === null || initialPinchDistance === 0) { initialPinchDistance = newPinchDistance; return; }
-    const scaleChange = newPinchDistance / initialPinchDistance;
-    const newObjectScale = currentScale * scaleChange;
-    selectedForManipulationObject.scale.set(newObjectScale, newObjectScale, newObjectScale);
-    if (pinchRotating) {
-      const newPinchAngle = getPinchAngle(event.touches);
-      if (initialPinchAngle === null) { initialPinchAngle = newPinchAngle; return; }
-      selectedForManipulationObject.rotation.y += (newPinchAngle - initialPinchAngle);
-      initialPinchAngle = newPinchAngle;
-    }
-  } else if (moving && event.touches.length === 1 && selectedForManipulationObject) {
-    if (initialTouchPosition === null) { initialTouchPosition = new THREE.Vector2(event.touches[0].pageX, event.touches[0].pageY); return; }
-    const currentTouch = new THREE.Vector2(event.touches[0].pageX, event.touches[0].pageY);
+  if (!selectedForManipulationObject) return; // No interaction if nothing is selected
+
+  if (moving && event.touches.length === 1 && initialTouchPosition) {
+    event.preventDefault();
+    const currentTouch = new THREE.Vector2(event.touches[0].clientX, event.touches[0].clientY);
     const dxScreen = currentTouch.x - initialTouchPosition.x;
     const dyScreen = currentTouch.y - initialTouchPosition.y;
-    
-    let activeCamera = camera; // Default to your main camera
-    if(renderer.xr.isPresenting){
-        const sdkCam = findPossibleSDKCamera(scene, camera);
-        if(sdkCam) activeCamera = sdkCam;
-        else { // if no SDK cam, ensure main camera is updated if we are to use it for movement context
-            renderer.xr.getCamera(camera); // update main camera from XR just in case
-            activeCamera = camera;
-        }
+
+    let orientationCamera = camera;
+    if (renderer.xr.isPresenting) {
+        const sdkCamera = findPossibleSDKCamera(scene, camera);
+        if (sdkCamera) {
+            const q = new THREE.Quaternion();
+            sdkCamera.matrixWorld.decompose(new THREE.Vector3(), q, new THREE.Vector3());
+            const isIdentityQuaternion = Math.abs(q.x) < 1e-5 && Math.abs(q.y) < 1e-5 && Math.abs(q.z) < 1e-5 && Math.abs(q.w - 1.0) < 1e-5;
+            if (!isIdentityQuaternion) orientationCamera = sdkCamera;
+            else renderer.xr.getCamera(camera); // Update main camera if SDK cam is identity
+        } else renderer.xr.getCamera(camera); // Update main camera if no SDK cam
     }
 
-    const cameraRight = new THREE.Vector3().setFromMatrixColumn(activeCamera.matrixWorld, 0); cameraRight.y=0; cameraRight.normalize();
-    const cameraForward = new THREE.Vector3().setFromMatrixColumn(activeCamera.matrixWorld, 2); cameraForward.negate(); cameraForward.y=0; cameraForward.normalize();
-    
-    const worldMoveX = cameraRight.clone().multiplyScalar(dxScreen * MOVE_SENSITIVITY);
-    const worldMoveZ = cameraForward.clone().multiplyScalar(-dyScreen * MOVE_SENSITIVITY);
+    const cameraRight = new THREE.Vector3();
+    const cameraFwd = new THREE.Vector3();
+    orientationCamera.getWorldDirection(cameraFwd);
+    cameraRight.crossVectors(orientationCamera.up, cameraFwd).normalize();
+    cameraFwd.y = 0; cameraFwd.normalize();
+    cameraRight.y = 0; cameraRight.normalize();
+    if (cameraFwd.lengthSq() < 0.0001) cameraFwd.set(0,0,-1);
+    if (cameraRight.lengthSq() < 0.0001) cameraRight.set(1,0,0);
+
+    const worldMoveX = cameraRight.multiplyScalar(dxScreen * MOVE_SENSITIVITY);
+    const worldMoveZ = cameraFwd.multiplyScalar(dyScreen * MOVE_SENSITIVITY);
+
     selectedForManipulationObject.position.add(worldMoveX).add(worldMoveZ);
     initialTouchPosition.copy(currentTouch);
+
+  } else if (pinchScaling && event.touches.length === 2) {
+    event.preventDefault();
+    const newPinchDistance = getPinchDistance(event.touches);
+    if (initialPinchDistance > 0) { // Avoid division by zero
+        const scaleFactor = newPinchDistance / initialPinchDistance;
+        const finalScale = currentScale * scaleFactor;
+        selectedForManipulationObject.scale.setScalar(Math.max(0.01, finalScale)); // Prevent zero or negative scale
+    }
+    if (pinchRotating) {
+        const newAngle = getTwoFingerAngle(event.touches);
+        const deltaAngle = newAngle - initialTwoFingerAngle;
+        selectedForManipulationObject.rotation.y += deltaAngle;
+        initialTwoFingerAngle = newAngle; // Update for next frame
+    }
+  } else if (threeFingerMoving && event.touches.length === 3) {
+    event.preventDefault();
+    const currentThreeFingerY = event.touches[0].clientY;
+    const deltaY = initialThreeFingerY - currentThreeFingerY; // Screen up = object up
+    selectedForManipulationObject.position.y = initialZPosition + (deltaY * 0.005); // Adjust sensitivity
   }
 }
 
 function onTouchEnd(event) {
-  if (threeFingerMoving && event.touches.length < 3) { threeFingerMoving = false; initialZPosition = null; initialThreeFingerY = null; }
-  if ((pinchScaling || pinchRotating) && event.touches.length < 2) {
-    if (selectedForManipulationObject) { currentScale = selectedForManipulationObject.scale.x; appLog("Gesture end, currentScale updated to:", currentScale.toFixed(3)); }
-    pinchScaling = false; pinchRotating = false; initialPinchDistance = null; initialPinchAngle = null;
+  let wasInteracting = moving || pinchScaling || pinchRotating || threeFingerMoving;
+
+  if (moving && (event.touches.length === 0 || !event.touches[0] || event.touches[0].identifier !== initialTouchPosition?.identifier)) { // Check if the specific moving touch ended
+    moving = false; initialTouchPosition = null; appLog("--- Touch End (Move) ---");
   }
-  if (moving && event.touches.length < 1) { moving = false; initialTouchPosition = null; }
-  if (event.touches.length === 0) {
-    threeFingerMoving = pinchScaling = pinchRotating = moving = false;
-    initialPinchDistance = null; initialPinchAngle = null; initialTouchPosition = null; initialZPosition = null; initialThreeFingerY = null;
-    appLog("--- Touch End (all fingers up) ---");
-  } else appLog(`--- Touch End (fingers left: ${event.touches.length}) ---`);
+  if ((pinchScaling || pinchRotating) && event.touches.length < 2) {
+    if(selectedForManipulationObject) currentScale = selectedForManipulationObject.scale.x; // Store final scale
+    pinchScaling = false; initialPinchDistance = null;
+    pinchRotating = false; initialTwoFingerAngle = null;
+    appLog("--- Touch End (Pinch/Rotate) ---");
+  }
+  if (threeFingerMoving && event.touches.length < 3) {
+    threeFingerMoving = false; initialZPosition = null; initialThreeFingerY = null;
+    appLog("--- Touch End (Z-Move) ---");
+  }
+
+  if (event.touches.length === 0) { // All fingers lifted
+    moving = pinchScaling = pinchRotating = threeFingerMoving = false;
+    initialTouchPosition = null; initialPinchDistance = null; initialTwoFingerAngle = null;
+    initialZPosition = null; initialThreeFingerY = null;
+    if(wasInteracting) appLog("--- Touch End (All fingers up, interaction ended) ---");
+    else appLog("--- Touch End (All fingers up, no interaction active) ---");
+  }
 }
 
-function getPinchDistance(touches) { return Math.hypot(touches[0].pageX - touches[1].pageX, touches[0].pageY - touches[1].pageY); }
-function getPinchAngle(touches) { return Math.atan2(touches[0].pageY - touches[1].pageY, touches[0].pageX - touches[1].pageX); }
+function getPinchDistance(touches) { return Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY); }
+function getTwoFingerAngle(touches) { return Math.atan2(touches[1].clientY - touches[0].clientY, touches[1].clientX - touches[0].clientX); }
