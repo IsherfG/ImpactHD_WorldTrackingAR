@@ -25,7 +25,7 @@ let selectedForManipulationObject = null;
 let currentSelectedIndex = -1; // Index of the selected object in allPlacedObjects
 let originalMaterials = new Map();
 
-const SELECTION_COLOR = 0xffaa00;
+const SELECTION_COLOR = 0xFFF176;
 const MOVE_SENSITIVITY = 0.002;
 const HDR_ENVIRONMENT_MAP_PATH = "hdr.hdr";
 
@@ -143,7 +143,7 @@ function highlightSelectedObject(object) {
       const highlightMaterial = new THREE.MeshStandardMaterial({
         color: SELECTION_COLOR,
         emissive: SELECTION_COLOR,
-        emissiveIntensity: 0.4,
+        emissiveIntensity: 0.1,
         map: originalChildMaterial?.map || null,
       });
       child.material = highlightMaterial;
